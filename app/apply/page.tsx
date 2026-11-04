@@ -27,7 +27,6 @@ interface Section {
   colorHex: string;
 }
 
-// 각 구역별 레이아웃 및 점유 좌석 설정
 interface SectionLayoutConfig {
   rows: string[];
   cols: number[];
@@ -44,22 +43,22 @@ const SECTIONS: Section[] = [
 const SECTION_CONFIGS: Record<string, SectionLayoutConfig> = {
   A: {
     rows: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'],
-    cols: Array.from({ length: 10 }, (_, i) => i + 1), // 1~10번
+    cols: Array.from({ length: 10 }, (_, i) => i + 1),
     occupied: new Set(['A3', 'A4', 'B7', 'C2', 'D5', 'F8', 'G9', 'J1', 'M10']),
   },
   B: {
-    rows: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'], // 10열
-    cols: Array.from({ length: 8 }, (_, i) => i + 1), // 1~8번
+    rows: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'],
+    cols: Array.from({ length: 8 }, (_, i) => i + 1),
     occupied: new Set(['A1', 'A2', 'C4', 'E6', 'H3']),
   },
   C: {
-    rows: ['1', '2', '3', '4', '5', '6', '7', '8'], // 8열
-    cols: Array.from({ length: 12 }, (_, i) => i + 1), // 1~12번
+    rows: ['1', '2', '3', '4', '5', '6', '7', '8'],
+    cols: Array.from({ length: 12 }, (_, i) => i + 1),
     occupied: new Set(['1-3', '1-4', '3-7', '5-5', '8-12']),
   },
   D: {
-    rows: ['1', '2', '3', '4', '5', '6'], // 6열
-    cols: Array.from({ length: 6 }, (_, i) => i + 1), // 1~6번
+    rows: ['1', '2', '3', '4', '5', '6'],
+    cols: Array.from({ length: 6 }, (_, i) => i + 1),
     occupied: new Set(['1-1', '2-3', '4-5']),
   },
 };
@@ -74,7 +73,6 @@ const RED = '#E5372B';
 export default function TicketLinkBookingPage() {
   const router = useRouter();
 
-  // 구역별 제비 배분 수량
   const [allocated, setAllocated] = useState<Record<string, number>>({
     A: 0,
     B: 0,
@@ -82,7 +80,6 @@ export default function TicketLinkBookingPage() {
     D: 0,
   });
 
-  // 구역별 상세 선택 좌석 번호 목록
   const [selectedSeatsBySection, setSelectedSeatsBySection] = useState<Record<string, string[]>>({
     A: [],
     B: [],
@@ -98,16 +95,23 @@ export default function TicketLinkBookingPage() {
     setMounted(true);
   }, []);
 
-  const usedBallots = Object.values(allocated).reduce((a, b) => a + b, 0);
+  // 총 선택된 좌석 수 계산
+  const totalSeatsCount = Object.values(selectedSeatsBySection).reduce(
+    (sum, arr) => sum + arr.length,
+    0
+  );
+  const usedBallots = Math.max(
+    Object.values(allocated).reduce((a, b) => a + b, 0),
+    totalSeatsCount
+  );
   const remainingBallots = TOTAL_BALLOTS - usedBallots;
 
-  // 구역 카드 또는 모달 열기
   const handleOpenSeatModal = (secId: string) => {
     setSelectedSection(secId);
     setIsSeatModalOpen(true);
   };
 
-  // 좌석 토글 핸들러
+  // 좌석 토글 핸들러: 클릭 즉시 allocated 상태까지 동기화
   const handleSeatToggle = (secId: string, seatId: string) => {
     const config = SECTION_CONFIGS[secId];
     if (config?.occupied.has(seatId)) return;
@@ -115,32 +119,33 @@ export default function TicketLinkBookingPage() {
     const currentSeats = selectedSeatsBySection[secId] || [];
     const isAlreadySelected = currentSeats.includes(seatId);
 
-    if (isAlreadySelected) {
-      // 선택 해제
-      setSelectedSeatsBySection((prev) => ({
-        ...prev,
-        [secId]: prev[secId].filter((s) => s !== seatId),
-      }));
-    } else {
-      // 신규 선택 (전체 선택된 총 좌석 수가 3장 미만이어야 함)
-      const totalSelectedCount = Object.values(selectedSeatsBySection).reduce(
-        (sum, arr) => sum + arr.length,
-        0
-      );
+    let updatedSectionSeats: string[];
 
-      if (totalSelectedCount >= TOTAL_BALLOTS) {
+    if (isAlreadySelected) {
+      updatedSectionSeats = currentSeats.filter((s) => s !== seatId);
+    } else {
+      if (totalSeatsCount >= TOTAL_BALLOTS) {
         alert(`1인당 최대 ${TOTAL_BALLOTS}장까지만 좌석을 선택할 수 있습니다.`);
         return;
       }
-
-      setSelectedSeatsBySection((prev) => ({
-        ...prev,
-        [secId]: [...prev[secId], seatId],
-      }));
+      updatedSectionSeats = [...currentSeats, seatId];
     }
+
+    const nextSelected = {
+      ...selectedSeatsBySection,
+      [secId]: updatedSectionSeats,
+    };
+
+    setSelectedSeatsBySection(nextSelected);
+    // allocated 상태 즉시 반영
+    setAllocated({
+      A: nextSelected.A.length,
+      B: nextSelected.B.length,
+      C: nextSelected.C.length,
+      D: nextSelected.D.length,
+    });
   };
 
-  // 모달에서 '선택 완료' 클릭 시
   const handleConfirmSeats = () => {
     setAllocated({
       A: selectedSeatsBySection.A.length,
@@ -151,7 +156,17 @@ export default function TicketLinkBookingPage() {
     setIsSeatModalOpen(false);
   };
 
-  // 전체 초기화
+  const handleCloseModal = () => {
+    // 닫기(X) 클릭 시에도 현재 선택된 좌석 수를 수량에 반영
+    setAllocated({
+      A: selectedSeatsBySection.A.length,
+      B: selectedSeatsBySection.B.length,
+      C: selectedSeatsBySection.C.length,
+      D: selectedSeatsBySection.D.length,
+    });
+    setIsSeatModalOpen(false);
+  };
+
   const handleResetAll = () => {
     setAllocated({ A: 0, B: 0, C: 0, D: 0 });
     setSelectedSeatsBySection({ A: [], B: [], C: [], D: [] });
@@ -166,7 +181,6 @@ export default function TicketLinkBookingPage() {
     router.push(`/confirm?${query.toString()}`);
   };
 
-  // 현재 열려있는 모달의 구역 정보
   const activeSectionInfo = SECTIONS.find((s) => s.id === selectedSection) || SECTIONS[0];
   const activeLayout = SECTION_CONFIGS[selectedSection] || SECTION_CONFIGS.A;
   const currentModalSelectedSeats = selectedSeatsBySection[selectedSection] || [];
@@ -338,7 +352,6 @@ export default function TicketLinkBookingPage() {
                       <span className="text-[13px] font-[700] text-[#333]">{sec.label}</span>
                       <span className="text-[10px] text-[#777]">{sec.desc}</span>
 
-                      {/* 선택된 좌석이 있으면 표시 */}
                       {seats.length > 0 ? (
                         <span className="mt-[6px] text-[10px] font-bold text-[#E5372B] line-clamp-1">
                           {seats.join(', ')}
@@ -459,6 +472,7 @@ export default function TicketLinkBookingPage() {
               </div>
             </div>
 
+            {/* 이전단계 / 다음단계 버튼 바 */}
             <div className="grid grid-cols-2 gap-[8px] border-t border-[#ddd] bg-[#fafafa] p-[12px]">
               <button
                 type="button"
@@ -471,9 +485,9 @@ export default function TicketLinkBookingPage() {
                 type="button"
                 onClick={handleNext}
                 disabled={usedBallots === 0}
-                className="h-[44px] rounded-[3px] border-0 bg-[#F0352A] text-[13px] font-[700] text-[#fff] transition hover:bg-[#d92a20] disabled:cursor-not-allowed disabled:bg-[#ccc]"
+                className="h-[44px] rounded-[3px] border-0 bg-[#F0352A] text-[13px] font-[700] text-[#fff] transition hover:bg-[#d92a20] disabled:cursor-not-allowed disabled:bg-[#ccc] cursor-pointer"
               >
-                다음단계
+                다음단계 ({usedBallots}석 선택됨)
               </button>
             </div>
           </aside>
@@ -528,7 +542,7 @@ export default function TicketLinkBookingPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setIsSeatModalOpen(false)}
+                onClick={handleCloseModal}
                 className="text-slate-400 hover:text-white transition p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -572,7 +586,6 @@ export default function TicketLinkBookingPage() {
 
                     <div className="flex items-center gap-1.5">
                       {activeLayout.cols.map((col) => {
-                        // C, D구역은 '1-1', A, B구역은 'A1' 포맷
                         const isAlphabetRow = isNaN(Number(row));
                         const seatId = isAlphabetRow ? `${row}${col}` : `${row}-${col}`;
                         const isOccupied = activeLayout.occupied.has(seatId);
@@ -634,12 +647,14 @@ export default function TicketLinkBookingPage() {
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <button
                   type="button"
-                  onClick={() =>
-                    setSelectedSeatsBySection((prev) => ({
-                      ...prev,
+                  onClick={() => {
+                    const nextSelected = {
+                      ...selectedSeatsBySection,
                       [selectedSection]: [],
-                    }))
-                  }
+                    };
+                    setSelectedSeatsBySection(nextSelected);
+                    setAllocated((prev) => ({ ...prev, [selectedSection]: 0 }));
+                  }}
                   className="px-3 py-2 border border-slate-300 rounded text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
                 >
                   현재 구역 초기화
