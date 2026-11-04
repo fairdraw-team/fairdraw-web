@@ -86,7 +86,15 @@ export default function DateSelectionPage() {
             <ChevronDown className="h-[12px] w-[12px] text-[#888]" />
           </span>
           <ul className="m-[0px] p-[0px] list-none flex items-center divide-x divide-[#ccc]">
-            <li className="px-[10px]">로그인</li>
+            <li className="px-[10px]">
+              <button
+                type="button"
+                onClick={() => router.push('/login')}
+                className="bg-transparent border-0 p-[0px] [font-family:inherit] text-inherit cursor-pointer hover:text-[#111]"
+              >
+                로그인
+              </button>
+            </li>
             <li className="px-[10px]">회원가입</li>
             <li className="px-[10px]">예매확인/취소</li>
             <li className="px-[10px]">고객센터</li>
@@ -104,6 +112,7 @@ export default function DateSelectionPage() {
           <span className="text-[34px] leading-none tracking-[-0.025em] text-[#111]">
             Fair<span className="font-[900]">Draw</span>
           </span>
+
           <nav className="flex items-center gap-[16px] text-[20px] font-[700] leading-none">
             <span className="text-[#111]">공연/전시</span>
             <span className="text-[#b5b5b5]">스포츠</span>
@@ -434,7 +443,7 @@ export default function DateSelectionPage() {
                 <div className="mt-[12px] space-y-[4px]">
                   <p className="m-[0px] font-[700]">2026년 11월 06일(금) ~ 2026년 11월 07일(토)</p>
                   <p>금 17:00, 19:30 / 토 18:00</p>
-                  <p className="m-[0px] pt-[8px] text-[#777]">* 회차별 출연진은 위 예매 패널에서 확인하실 수 있습니다.</p>
+                  <p className="m-[0px] pt-[8px] text-[#777]">회차별 출연진은 위 예매 패널에서 확인하실 수 있습니다.</p>
                 </div>
 
                 <h3 id="notice" className="m-[0px] mt-[48px] scroll-mt-[24px] text-[15px] font-[700] text-[#111]">
@@ -445,9 +454,9 @@ export default function DateSelectionPage() {
                   본 공연은 선착순이 아닌 추첨제로 진행됩니다. 마감 전까지 응모하셔도 당첨 확률은 동일합니다.
                 </div>
                 <div className="mt-[20px] space-y-[4px] text-[#555]">
-                  <p>* 응모권은 1인 최대 3장까지 신청할 수 있습니다.</p>
-                  <p>* 좌석은 구역 단위로 응모하며, 추첨 결과에 따라 배정됩니다.</p>
-                  <p>* 공연 시간과 출연진은 현장 사정에 따라 변경될 수 있습니다.</p>
+                  <p>응모권은 1인 최대 3장까지 신청할 수 있습니다.</p>
+                  <p>좌석은 구역 단위로 응모하며, 추첨 결과에 따라 배정됩니다.</p>
+                  <p>공연 시간과 출연진은 현장 사정에 따라 변경될 수 있습니다.</p>
                 </div>
               </>
             ) : (
