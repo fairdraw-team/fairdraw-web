@@ -20,6 +20,8 @@ const PAGE_CSS = `
 .tl-pulse { animation: tlPulse 2s ease-in-out infinite; }
 `;
 
+const MONO = "font-['ui-monospace','SFMono-Regular','Menlo','Consolas',monospace]";
+
 export default function MyPage() {
   const router = useRouter();
 
@@ -34,7 +36,7 @@ export default function MyPage() {
       try {
         setLoading(true);
 
-        // 1. 세션에서 JWT 토큰 추출 (Swagger 테스트 복사용)
+        // ① 세션에서 JWT 토큰 추출 (Swagger 테스트용 토큰 복사 목적)
         const {
           data: { session },
         } = await supabase.auth.getSession();
@@ -42,7 +44,7 @@ export default function MyPage() {
           setToken(session.access_token);
         }
 
-        // 2. 가이드 7번 공통 함수(apiFetch)로 백엔드 GET /api/me 호출
+        // ② apiFetch를 통해 백엔드 GET /api/me 호출 (이름, 전화번호, 역할 수신)
         const data = await apiFetch<UserProfile>('/api/me');
         setProfile(data);
       } catch (err: any) {
@@ -55,7 +57,7 @@ export default function MyPage() {
     loadData();
   }, []);
 
-  // 1주차 전용: 내 토큰 복사 기능
+  // 1주차 전용: 백엔드 Swagger 테스트용 토큰 복사
   const handleCopyToken = async () => {
     if (!token) {
       alert('복사할 세션 토큰이 없습니다.');
@@ -76,10 +78,10 @@ export default function MyPage() {
     router.push('/login');
   };
 
-  const infoRows: [string, string][] = [
-    ['이름 (실명)', profile?.realName || '-'],
-    ['휴대폰 번호', profile?.phone || '-'],
-    ['권한 및 역할', profile?.role || 'USER'],
+  const infoRows: [string, string, boolean][] = [
+    ['이름 (실명)', profile?.realName || '-', false],
+    ['휴대폰 번호', profile?.phone || '-', true],
+    ['역할 (Role)', profile?.role || 'USER', false],
   ];
 
   return (
@@ -95,7 +97,7 @@ export default function MyPage() {
           <button
             type="button"
             onClick={handleLogout}
-            className="bg-transparent border-0 p-[0px] [font-family:inherit] flex items-center gap-[4px] text-[11px] text-[#555] hover:text-[#111]"
+            className="[font-family:inherit] flex items-center gap-[4px] border-0 bg-transparent p-[0px] text-[11px] text-[#555] hover:text-[#111] cursor-pointer"
           >
             <LogOut className="h-[13px] w-[13px]" /> 로그아웃
           </button>
@@ -129,7 +131,7 @@ export default function MyPage() {
                 {profile?.role || 'USER'}
               </span>
             </div>
-            <p className="m-[0px] mt-[4px] text-[12px] text-[#777]">본인확인 및 회원 정보가 연동되었습니다.</p>
+            <p className="m-[0px] mt-[4px] text-[12px] text-[#777]">본인확인 및 계정 정보가 연동되었습니다.</p>
           </div>
         </section>
 
@@ -145,17 +147,17 @@ export default function MyPage() {
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="[font-family:inherit] mt-[14px] h-[36px] rounded-[3px] border border-[#222] bg-[#fff] px-[20px] text-[12px] font-[700] text-[#222] hover:bg-[#f6f6f6]"
+              className="[font-family:inherit] mt-[14px] h-[36px] rounded-[3px] border border-[#222] bg-[#fff] px-[20px] text-[12px] font-[700] text-[#222] hover:bg-[#f6f6f6] cursor-pointer"
             >
               다시 시도
             </button>
           </div>
         ) : (
           <dl className="m-[0px]">
-            {infoRows.map(([k, v]) => (
+            {infoRows.map(([k, v, mono]) => (
               <div key={k} className="flex items-center justify-between border-b border-[#eee] py-[14px] text-[13px]">
                 <dt className="text-[#777]">{k}</dt>
-                <dd className="m-[0px] font-[700] tabular-nums text-[#222]">{v}</dd>
+                <dd className={`m-[0px] font-[700] tabular-nums text-[#222] ${mono ? MONO : ''}`}>{v}</dd>
               </div>
             ))}
           </dl>
@@ -170,7 +172,7 @@ export default function MyPage() {
             <button
               type="button"
               onClick={handleCopyToken}
-              className="[font-family:inherit] flex h-[28px] items-center gap-[4px] rounded-[3px] border border-[#222] bg-[#fff] px-[10px] text-[11px] font-[700] text-[#222] transition hover:bg-[#f6f6f6]"
+              className="[font-family:inherit] flex h-[28px] items-center gap-[4px] rounded-[3px] border border-[#222] bg-[#fff] px-[10px] text-[11px] font-[700] text-[#222] transition hover:bg-[#f6f6f6] active:scale-95 cursor-pointer"
             >
               {copied ? (
                 <>
@@ -188,8 +190,8 @@ export default function MyPage() {
 
           <div className="mt-[12px] border border-dashed border-[#ccc] bg-[#f5f5f5] px-[14px] py-[12px]">
             <p className="m-[0px] text-[12px] leading-[1.625] text-[#666]">
-              * 백엔드 개발 담당자가 Swagger UI 상단{' '}
-              <code className="rounded-[2px] bg-[#e8e8e8] px-[4px] py-[1px] text-[11px] font-[600] text-[#333] font-['ui-monospace','SFMono-Regular','Menlo','Consolas',monospace]">
+              * 백엔드 담당자가 Swagger UI 상단{' '}
+              <code className={`rounded-[2px] bg-[#e8e8e8] px-[4px] py-[1px] text-[11px] font-[600] text-[#333] ${MONO}`}>
                 Authorize
               </code>{' '}
               버튼에 붙여넣어 API를 테스트할 수 있는 현재 세션 토큰입니다.
@@ -198,11 +200,11 @@ export default function MyPage() {
         </section>
       </main>
 
-      {/* ───── 하단 상태 푸터 ───── */}
+      {/* ───── 하단 연결 상태 푸터 ───── */}
       <footer className="border-t border-[#e5e5e5]">
         <div className="mx-auto flex max-w-[480px] items-center justify-center gap-[8px] px-[16px] py-[14px] text-[11px] font-[500] text-[#1E9E63]">
           <span className="tl-pulse h-[8px] w-[8px] rounded-full bg-[#1E9E63]" />
-          <span>프론트엔드 ➔ Supabase ➔ 백엔드 3구간 정상 연결됨</span>
+          <span>화면 ➔ Supabase ➔ 백엔드 세 구간 연결 완료</span>
         </div>
       </footer>
     </div>
