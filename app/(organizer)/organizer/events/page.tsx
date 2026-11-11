@@ -1,170 +1,283 @@
 'use client';
 
+// 동적 파라미터 [id] 정적 생성 방지
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
-import { formatKst, timeLeft } from '@/lib/datetime';
+import { formatKst } from '@/lib/datetime';
 import { StatusBadge } from '@/components/organizer/StatusBadge';
-import type { EventItem } from '@/types/api';
+import {
+  ChevronLeft,
+  Calendar,
+  MapPin,
+  Ticket,
+  Users,
+  Lock,
+  Copy,
+  Check,
+  ShieldCheck,
+  AlertTriangle,
+  RefreshCw,
+} from 'lucide-react';
 
-const POSTER_GRADIENTS = [
-  'from-indigo-600 to-sky-500',
-  'from-rose-600 to-orange-400',
-  'from-emerald-600 to-teal-400',
-  'from-violet-600 to-pink-500',
-];
-const gradientOf = (id: string) =>
-  POSTER_GRADIENTS[
-    [...id].reduce((s, c) => s + c.charCodeAt(0), 0) % POSTER_GRADIENTS.length
-  ];
+interface Section {
+  id: string;
+  name: string;
+  capacity: number;
+  price: number;
+  entryCount?: number;
+}
 
-export default function MyEventsPage() {
-  const [events, setEvents] = useState<EventItem[] | null>(null);
+interface OrganizerEventDetail {
+  id: string;
+  title: string;
+  venue: string;
+  eventAt: string;
+  entryEndAt: string;
+  status: 'draft' | 'open' | 'closed' | 'drawn' | 'done';
+  ballotsPerPerson: number;
+  sections: Section[];
+  totalEntries?: number;
+  rosterHash?: string;
+  sealedAt?: string;
+}
+
+export default function OrganizerEventDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const eventId = (params?.id as string) || '';
+
+  const [event, setEvent] = useState<OrganizerEventDetail | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState<number | null>(null);
+  const [sealing, setSealing] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function fetchEventDetail() {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await apiFetch<OrganizerEventDetail>(`/api/organizer/events/${eventId}`);
+      setEvent(data);
+    } catch (err: any) {
+      setError(err.message || '공연 상세 정보를 불러오지 못했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    // 1. 클라이언트 마운트 직후 시각 설정 및 1초 주기 타이머
-    setNow(Date.now());
-    const timer = setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
+    if (eventId) {
+      fetchEventDetail();
+    }
+  }, [eventId]);
 
-    // 2. 주최자 본인의 공연 목록 조회
-    async function loadEvents() {
-      try {
-        const data = await apiFetch<EventItem[]>('/api/organizer/events');
-        setEvents(data);
-      } catch (err: any) {
-        setError(err.message || '공연 목록을 불러오지 못했습니다.');
-        setEvents([]); // 에러 시 빈 배열로 안전하게 폴백
-      }
+  // 마감(명단 봉인) 요청
+  const handleSealEvent = async () => {
+    if (!window.confirm('정말 응모를 마감하고 명단을 봉인하시겠습니까?\n마감 이후에는 관객 응모 및 취소가 영구히 차단됩니다.')) {
+      return;
     }
 
-    loadEvents();
+    try {
+      setSealing(true);
+      await apiFetch(`/api/organizer/events/${eventId}/seal`, {
+        method: 'POST',
+      });
+      alert('응모가 정상적으로 마감되고 명단 지문(해시)이 생성되었습니다.');
+      await fetchEventDetail();
+    } catch (err: any) {
+      alert(err.message || '마감 처리에 실패했습니다.');
+    } finally {
+      setSealing(false);
+    }
+  };
 
-    return () => clearInterval(timer);
-  }, []);
+  const handleCopyHash = async (hash: string) => {
+    try {
+      await navigator.clipboard.writeText(hash);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      alert('해시 복사에 실패했습니다.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-96 items-center justify-center rounded-2xl border border-stone-200 bg-white">
+        <p className="text-sm font-semibold text-stone-500">공연 및 응모 현황을 불러오는 중입니다...</p>
+      </div>
+    );
+  }
+
+  if (error || !event) {
+    return (
+      <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-center">
+        <AlertTriangle className="mx-auto h-8 w-8 text-rose-600 mb-2" />
+        <h2 className="text-base font-bold text-rose-900">{error || '공연 정보를 찾을 수 없습니다.'}</h2>
+        <div className="mt-4 flex justify-center gap-2">
+          <button
+            type="button"
+            onClick={fetchEventDetail}
+            className="rounded-lg bg-white px-4 py-2 text-xs font-semibold text-stone-700 border border-stone-200 shadow-xs hover:bg-stone-50"
+          >
+            다시 시도
+          </button>
+          <Link
+            href="/organizer/events"
+            className="rounded-lg bg-stone-900 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-stone-800"
+          >
+            목록으로 돌아가기
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const isClosedOrDrawn = event.status === 'closed' || event.status === 'drawn' || event.status === 'done';
 
   return (
     <div className="space-y-6">
-      {/* 타이틀 및 등록 버튼 헤더 */}
+      {/* 상단 네비게이션 & 액션 */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-black tracking-tight text-stone-900 sm:text-3xl">
-              주최 공연 관리
-            </h1>
-            {events && (
-              <span className="rounded-full bg-stone-200/80 px-2.5 py-0.5 text-xs font-bold text-stone-700">
-                총 {events.length}건
-              </span>
-            )}
-          </div>
-          <p className="mt-1 text-sm text-stone-500">
-            개설하신 공연의 좌석 구역 설정, 응모 개시, 스태프 권한을 통합 관리하실 수 있습니다.
-          </p>
-        </div>
         <Link
-          href="/organizer/events/new"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-stone-800"
+          href="/organizer/events"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900"
         >
-          <span>+ 새 공연 등록</span>
+          <ChevronLeft className="h-4 w-4" />
+          <span>주최 공연 목록으로</span>
         </Link>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={fetchEventDetail}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-700 shadow-xs hover:bg-stone-50"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span>새로고침</span>
+          </button>
+
+          {/* 마감(봉인) 버튼 */}
+          {!isClosedOrDrawn && (
+            <button
+              type="button"
+              onClick={handleSealEvent}
+              disabled={sealing}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-rose-700 disabled:opacity-50 cursor-pointer"
+            >
+              <Lock className="h-3.5 w-3.5" />
+              <span>{sealing ? '봉인 처리 중...' : '응모 마감 (명단 봉인)'}</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {error && (
-        <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">
-          {error}
+      {/* 공연 헤더 정보 */}
+      <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
+        <div className="flex flex-wrap items-center gap-2.5 mb-2">
+          <StatusBadge status={event.status} />
+          <span className="text-xs font-bold text-stone-400">ID: {event.id}</span>
+        </div>
+        <h1 className="text-2xl font-black tracking-tight text-stone-900 sm:text-3xl">
+          {event.title}
+        </h1>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3 border-t border-stone-100 pt-4 text-xs text-stone-600">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-stone-400" />
+            <span>공연일시: <strong>{formatKst(event.eventAt)}</strong></span>
+          </div>
+          <div className="flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-stone-400" />
+            <span>장소: <strong>{event.venue}</strong></span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Ticket className="h-4 w-4 text-stone-400" />
+            <span>1인당 제비: <strong>최대 {event.ballotsPerPerson}장</strong></span>
+          </div>
+        </div>
+      </div>
+
+      {/* 봉인 완료 지문 상자 (closed 이상일 때) */}
+      {isClosedOrDrawn && event.rosterHash && (
+        <div className="rounded-2xl border-2 border-stone-800 bg-stone-900 p-6 text-white shadow-md">
+          <div className="flex items-center justify-between border-b border-stone-700 pb-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-[#3B73E8]" />
+              <h2 className="text-sm font-black">명단 봉인(Seal) 완료 정보</h2>
+            </div>
+            <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[11px] font-bold text-emerald-400 border border-emerald-500/30">
+              위변조 방지 암호화 적용됨
+            </span>
+          </div>
+
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-stone-800/80 p-3.5 rounded-xl border border-stone-700">
+            <div className="flex items-center gap-2 overflow-hidden">
+              <span className="text-xs font-bold text-stone-400 shrink-0">명단 지문 (SHA-256):</span>
+              <code className="text-xs font-mono font-bold text-rose-400 bg-stone-950 px-2 py-1 rounded">
+                {event.rosterHash.slice(0, 8)}...{event.rosterHash.slice(-4)}
+              </code>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleCopyHash(event.rosterHash!)}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-stone-700 px-3 py-1.5 text-xs font-bold hover:bg-stone-600 transition shrink-0 cursor-pointer"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-emerald-400" />
+                  <span className="text-emerald-400">전체 복사됨</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" />
+                  <span>해시 전체 복사</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       )}
 
-      {!events && !error && (
-        <div className="flex items-center justify-center rounded-2xl border border-stone-200 bg-white p-12 text-sm text-stone-400">
-          <span>공연 목록을 불러오는 중입니다…</span>
+      {/* 구역별 좌석 및 응모 현황 표 */}
+      <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
+        <h2 className="text-sm font-black text-stone-900 mb-4 flex items-center gap-2">
+          <Users className="h-4 w-4 text-[#3B73E8]" />
+          <span>구역별 정원 및 응모 현황</span>
+        </h2>
+        <div className="overflow-x-auto rounded-xl border border-stone-200">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="bg-stone-50 text-stone-500 border-b border-stone-200">
+              <tr>
+                <th className="py-2.5 px-4 font-semibold">구역명</th>
+                <th className="py-2.5 px-4 font-semibold">좌석 정원</th>
+                <th className="py-2.5 px-4 font-semibold">가격</th>
+                <th className="py-2.5 px-4 font-semibold">현재 응모 제비</th>
+                <th className="py-2.5 px-4 font-semibold">경쟁률</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-100 font-medium">
+              {event.sections?.map((sec) => {
+                const count = sec.entryCount || 0;
+                const ratio = sec.capacity > 0 ? (count / sec.capacity).toFixed(2) : '0.00';
+
+                return (
+                  <tr key={sec.id} className="hover:bg-stone-50">
+                    <td className="py-3 px-4 font-bold text-stone-900">{sec.name}</td>
+                    <td className="py-3 px-4 text-stone-600">{sec.capacity.toLocaleString()}석</td>
+                    <td className="py-3 px-4 text-stone-600">{sec.price > 0 ? `${sec.price.toLocaleString()}원` : '무료'}</td>
+                    <td className="py-3 px-4 text-rose-600 font-bold">{count.toLocaleString()}장</td>
+                    <td className="py-3 px-4 font-bold text-stone-900">{ratio} : 1</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-      )}
-
-      {events?.length === 0 && (
-        <div className="rounded-2xl border-2 border-dashed border-stone-200 bg-white p-12 text-center">
-          <p className="text-base font-semibold text-stone-700">등록된 주최 공연이 없습니다.</p>
-          <p className="mt-1 text-sm text-stone-500">새로운 공연과 좌석 구역을 개설하고 공정 추첨을 시작해 보세요.</p>
-          <Link
-            href="/organizer/events/new"
-            className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-stone-800"
-          >
-            <span>+ 첫 공연 등록하기</span>
-          </Link>
-        </div>
-      )}
-
-      {/* 공연 카드 그리드 */}
-      <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {events?.map((ev) => {
-          const totalSeats = (ev.sections ?? []).reduce((sum, s) => sum + s.capacity, 0);
-
-          return (
-            <li key={ev.id}>
-              <Link
-                href={`/organizer/events/${ev.id}`}
-                className="group flex h-full flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-xs transition hover:-translate-y-1 hover:border-stone-300 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-stone-900"
-              >
-                {/* 상단 포스터 이미지 썸네일 */}
-                <div className="relative aspect-[16/10] w-full overflow-hidden bg-stone-100">
-                  {ev.posterUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={ev.posterUrl}
-                      alt={ev.title}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className={`flex h-full w-full items-end bg-gradient-to-br ${gradientOf(ev.id)} p-4 text-white`}>
-                      <span className="text-4xl font-black opacity-30">{ev.title.charAt(0)}</span>
-                    </div>
-                  )}
-
-                  {/* 포스터 위 뱃지 오버레이 (now가 있을 때만 계산, 없을 땐 빈 텍스트) */}
-                  <div className="absolute inset-x-3 top-3 flex items-center justify-between gap-2">
-                    <StatusBadge status={ev.status} />
-                    <span className="rounded-md bg-stone-950/75 px-2 py-0.5 text-[11px] font-bold text-white backdrop-blur-xs">
-                      응모 마감 {now ? timeLeft(ev.entryEndAt, now) : '-'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 하단 공연 상세 메타데이터 */}
-                <div className="flex flex-1 flex-col p-5">
-                  <h2 className="line-clamp-2 text-base font-bold leading-snug text-stone-900 group-hover:text-indigo-600">
-                    {ev.title}
-                  </h2>
-
-                  <div className="mt-3 space-y-1.5 border-t border-stone-100 pt-3 text-xs text-stone-600">
-                    <div className="flex items-center justify-between">
-                      <span className="text-stone-400">공연 일시</span>
-                      <span className="font-medium text-stone-800">{formatKst(ev.eventAt)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-stone-400">공연 장소</span>
-                      <span className="truncate font-medium text-stone-800">{ev.venue}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-stone-400">좌석 정원</span>
-                      <span className="font-semibold text-stone-900">
-                        {ev.sections?.length ? `${ev.sections.length}개 구역 (총 ${totalSeats.toLocaleString()}석)` : '구역 미설정'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-end border-t border-stone-100 pt-3 text-xs font-semibold text-stone-500 group-hover:text-stone-900">
-                    <span>상세 관리 및 제어 이동 →</span>
-                  </div>
-                </div>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+      </div>
     </div>
   );
 }
