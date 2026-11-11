@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+
+import { Suspense, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FormProvider, useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -9,7 +10,7 @@ import { newEventSchema, type NewEventFormValues } from '@/lib/eventSchema';
 import { EventInfoFields, inputCls, toNumber } from '@/components/organizer/EventInfoFields';
 import type { EventInput, EventItem, SectionInput } from '@/types/api';
 
-export default function NewEventPage() {
+function NewEventFormContent() {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
   const form = useForm<NewEventFormValues>({
@@ -29,6 +30,8 @@ export default function NewEventPage() {
     handleSubmit,
     formState: { errors, isSubmitting },
   } = form;
+
+  // useFieldArray가 Suspense 경계 내부에서 안전하게 실행됩니다.
   const { fields, append, remove } = useFieldArray({ control, name: 'sections' });
 
   async function onSubmit({ sections, ...v }: NewEventFormValues) {
@@ -183,5 +186,20 @@ export default function NewEventPage() {
         </div>
       </form>
     </FormProvider>
+  );
+}
+
+// Next.js 16 빌드 환경에서 정적 사전 렌더링 크래시를 방지하기 위해 Suspense로 래핑
+export default function NewEventPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-96 items-center justify-center rounded-2xl border border-stone-200 bg-white">
+          <p className="text-sm font-semibold text-stone-400">공연 등록 화면을 불러오는 중입니다…</p>
+        </div>
+      }
+    >
+      <NewEventFormContent />
+    </Suspense>
   );
 }

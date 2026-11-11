@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { Suspense, use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
@@ -8,7 +8,8 @@ import type { Team, EventItem, SealInfo } from '@/types/api';
 import { SealBox } from '@/components/SealBox';
 import { formatKst } from '@/lib/datetime';
 
-export default function TeamDetailPage({
+// 1. 실제 use(params) 및 상태/화면을 담당하는 내부 컴포넌트
+function TeamDetailContent({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -203,7 +204,7 @@ export default function TeamDetailPage({
           </div>
         </div>
 
-        {/* 팀장 전용 초대 코드 박스 (마감 전 & 정원 미달일 때 핵심 노출) */}
+        {/* 팀장 전용 초대 코드 박스 */}
         {team.inviteCode && !isClosed && (
           <div className="rounded-2xl border-2 border-dashed border-indigo-500/40 bg-indigo-950/20 p-6 text-center shadow-lg">
             <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400">
@@ -300,5 +301,27 @@ export default function TeamDetailPage({
         )}
       </div>
     </main>
+  );
+}
+
+// 2. Next.js 16 빌드 환경에서 URL 데이터 사전 렌더링 충돌을 방지하는 최상위 Suspense 래핑
+export default function TeamDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center p-4">
+          <div className="flex items-center gap-3 text-neutral-400 text-sm">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-400 border-t-transparent" />
+            팀 화면을 불러오는 중입니다...
+          </div>
+        </main>
+      }
+    >
+      <TeamDetailContent params={params} />
+    </Suspense>
   );
 }

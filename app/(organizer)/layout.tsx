@@ -4,7 +4,6 @@ import React, { Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabase';
-import { Calendar, PlusCircle, LogOut, ExternalLink } from 'lucide-react';
 
 function OrganizerNav() {
   const pathname = usePathname();
@@ -21,7 +20,9 @@ function OrganizerNav() {
             : 'hover:bg-stone-50 hover:text-stone-900'
         }`}
       >
-        <Calendar className="h-4 w-4" />
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
         <span>공연 관리</span>
       </Link>
       <Link
@@ -32,7 +33,9 @@ function OrganizerNav() {
             : 'hover:bg-stone-50 hover:text-stone-900'
         }`}
       >
-        <PlusCircle className="h-4 w-4" />
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
         <span>새 공연 개설</span>
       </Link>
     </nav>
@@ -47,13 +50,20 @@ export default function OrganizerLayout({
   const router = useRouter();
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
+    try {
+      if (supabase?.auth) {
+        await supabase.auth.signOut();
+      }
+    } catch {
+      // 로그아웃 실패 무시
+    } finally {
+      router.push('/login');
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-[#222] font-sans antialiased">
-      <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/95 backdrop-blur-xs">
+      <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/95 backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-6">
             <Link href="/organizer/events" className="flex items-center gap-2">
@@ -65,7 +75,6 @@ export default function OrganizerLayout({
               </span>
             </Link>
 
-            {/* usePathname을 사용하는 컴포넌트를 Suspense로 감싸서 Prerender 에러 방지 */}
             <Suspense fallback={<div className="w-40 h-8 bg-stone-100 rounded animate-pulse" />}>
               <OrganizerNav />
             </Suspense>
@@ -78,7 +87,9 @@ export default function OrganizerLayout({
               className="hidden sm:inline-flex items-center gap-1 text-xs text-stone-500 hover:text-stone-900 font-medium"
             >
               <span>관객 화면 바로가기</span>
-              <ExternalLink className="h-3 w-3" />
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
             </Link>
             <div className="h-4 w-px bg-stone-200 hidden sm:block" />
             <button
@@ -86,7 +97,9 @@ export default function OrganizerLayout({
               onClick={handleLogout}
               className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition cursor-pointer"
             >
-              <LogOut className="h-3.5 w-3.5" />
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
               <span>로그아웃</span>
             </button>
           </div>

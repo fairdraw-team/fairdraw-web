@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
@@ -18,9 +18,10 @@ import type {
 
 const won = (n: number) => `${n.toLocaleString('ko-KR')}원`;
 
-export default function EventDetailPage() {
+// useParams와 라우팅 로직을 담당하는 내부 컴포넌트
+function EventDetailContent() {
   const params = useParams();
-  const id = params?.id as string;
+  const id = typeof params?.id === 'string' ? params.id : Array.isArray(params?.id) ? params.id[0] : '';
   const router = useRouter();
 
   // 기본 공연 정보 및 탭 상태
@@ -241,13 +242,11 @@ export default function EventDetailPage() {
     ['실제 공연 일시', ev.eventAt],
   ];
 
-  // 마감 시각 도달 여부 판별 (now가 null이면 기본 false)
   const endAt = new Date(ev.entryEndAt).getTime();
   const isAfterEnd = now !== null ? now >= endAt : false;
 
   return (
     <div className="space-y-6">
-      {/* 뒤로가기 네비게이션 */}
       <Link
         href="/organizer/events"
         className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-900"
@@ -255,7 +254,6 @@ export default function EventDetailPage() {
         <span>&larr; 주최 공연 목록으로 돌아가기</span>
       </Link>
 
-      {/* 상단 히어로 배너 카드 */}
       <div className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-xs">
         <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-start sm:p-8">
           <div className="relative aspect-[3/4] w-full shrink-0 overflow-hidden rounded-2xl border border-stone-200 bg-stone-100 shadow-sm sm:w-44">
@@ -302,7 +300,6 @@ export default function EventDetailPage() {
               </div>
             </div>
 
-            {/* 상태별 제어 버튼 */}
             <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-stone-100 pt-5">
               {ev.status === 'draft' && (
                 <>
@@ -376,10 +373,8 @@ export default function EventDetailPage() {
         </div>
       )}
 
-      {/* 봉인 완료 시 상단 SealBox 노출 */}
       {seal && <SealBox seal={seal} className="my-2" />}
 
-      {/* 탭 네비게이션 */}
       <div className="flex border-b border-stone-200">
         <button
           type="button"
@@ -410,7 +405,6 @@ export default function EventDetailPage() {
         </button>
       </div>
 
-      {/* 탭 1: 공연 기본 정보 */}
       {activeTab === 'info' && (
         <div className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-2">
@@ -456,7 +450,6 @@ export default function EventDetailPage() {
             </section>
           </div>
 
-          {/* 좌석 구역 상세 표 */}
           <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-xs">
             <div className="mb-4 flex items-baseline justify-between">
               <div>
@@ -503,15 +496,12 @@ export default function EventDetailPage() {
             )}
           </section>
 
-          {/* 현장 스태프 등록 */}
           <StaffForm eventId={ev.id} />
         </div>
       )}
 
-      {/* 탭 2: 실시간 응모 현황 및 봉인 */}
       {activeTab === 'stats' && (
         <div className="space-y-6">
-          {/* 상단 3대 지표 */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-xs">
               <div className="text-xs font-medium text-stone-500">총 응모 인원</div>
@@ -542,7 +532,6 @@ export default function EventDetailPage() {
             </div>
           </div>
 
-          {/* 구역별 실시간 경쟁률 표 */}
           <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-xs">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div>
@@ -603,7 +592,6 @@ export default function EventDetailPage() {
             </div>
           </section>
 
-          {/* 응모자 명단 표 & 페이징 */}
           <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-xs">
             <div className="mb-4 flex items-center justify-between">
               <div>
@@ -676,7 +664,6 @@ export default function EventDetailPage() {
             )}
           </section>
 
-          {/* 마감 및 명단 봉인 버튼 영역 */}
           {ev.status === 'open' && !seal && (
             <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-xs">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -713,5 +700,20 @@ export default function EventDetailPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// 최상위 default export 컴포넌트: Suspense로 전체 감싸기
+export default function EventDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center rounded-2xl bg-white p-12 text-sm text-stone-400">
+          공연 화면을 준비하는 중입니다…
+        </div>
+      }
+    >
+      <EventDetailContent />
+    </Suspense>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useState } from 'react';
+
+import { Suspense, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { FormProvider, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -9,8 +10,8 @@ import { eventSchema, type EventFormValues } from '@/lib/eventSchema';
 import { EventInfoFields } from '@/components/organizer/EventInfoFields';
 import type { EventInput, EventItem } from '@/types/api';
 
-// 공연 정보 수정 (준비 중 상태일 때만 상세 화면에서 진입)
-export default function EditEventPage() {
+// 1. useParams 및 폼 로직을 담당하는 내부 컴포넌트
+function EditEventContent() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [loaded, setLoaded] = useState(false);
@@ -18,6 +19,7 @@ export default function EditEventPage() {
   const form = useForm<EventFormValues>({ resolver: zodResolver(eventSchema) });
 
   useEffect(() => {
+    if (!id) return;
     apiFetch<EventItem>(`/api/events/${id}`)
       .then((ev) => {
         form.reset({
@@ -99,5 +101,20 @@ export default function EditEventPage() {
         )}
       </form>
     </FormProvider>
+  );
+}
+
+// 2. Next.js 16 사전 렌더링(Prerender) 충돌을 방지하기 위한 최상위 Suspense 래핑
+export default function EditEventPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center rounded-2xl bg-white p-12 text-sm text-stone-400">
+          공연 수정 화면을 불러오는 중입니다…
+        </div>
+      }
+    >
+      <EditEventContent />
+    </Suspense>
   );
 }

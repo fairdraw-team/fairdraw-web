@@ -18,13 +18,18 @@ const gradientOf = (id: string) =>
 export default function PublicEventsPage() {
   const [events, setEvents] = useState<EventItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState(() => Date.now());
+  // 1. 초기값을 null로 설정하여 빌드 타임 사전 평가 방지
+  const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
+    // 2. 브라우저 마운트 직후 시각 초기화 및 1분 주기 갱신
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), 60_000);
+
     apiFetch<EventItem[]>('/api/public/events', { auth: false })
       .then(setEvents)
       .catch((e: Error) => setError(e.message));
-    const t = setInterval(() => setNow(Date.now()), 60_000);
+
     return () => clearInterval(t);
   }, []);
 
@@ -122,13 +127,13 @@ export default function PublicEventsPage() {
                     </div>
                   )}
 
-                  {/* 포스터 오버레이 뱃지 */}
+                  {/* 포스터 오버레이 뱃지 (now가 세팅되기 전에는 '-'로 표시) */}
                   <div className="absolute inset-x-2 top-2 flex items-center justify-between gap-1">
                     <span className="rounded-md bg-emerald-600/90 px-2 py-0.5 text-[11px] font-extrabold text-white backdrop-blur-xs">
                       응모 중
                     </span>
                     <span className="rounded-md bg-stone-950/75 px-2 py-0.5 text-[11px] font-bold text-white backdrop-blur-xs">
-                      {timeLeft(ev.entryEndAt, now)}
+                      {now ? timeLeft(ev.entryEndAt, now) : '-'}
                     </span>
                   </div>
                 </div>

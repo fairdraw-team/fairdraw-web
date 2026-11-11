@@ -1,7 +1,6 @@
 'use client';
 
-// 동적 파라미터 [id] 정적 생성 방지
-export const dynamic = 'force-dynamic';
+
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
