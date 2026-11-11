@@ -1,31 +1,50 @@
 'use client';
 
-// 빌드 시 정적 사전 렌더링(Prerender) 충돌 방지
-export const dynamic = 'force-dynamic';
-
-import React from 'react';
+import React, { Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import {
-  Calendar,
-  PlusCircle,
-  LogOut,
-  ShieldCheck,
-  ChevronRight,
-  ExternalLink,
-} from 'lucide-react';
+import { Calendar, PlusCircle, LogOut, ExternalLink } from 'lucide-react';
+
+function OrganizerNav() {
+  const pathname = usePathname();
+  const isEvents = pathname === '/organizer/events';
+  const isNew = pathname === '/organizer/events/new';
+
+  return (
+    <nav className="hidden md:flex items-center gap-1 text-sm font-semibold text-stone-600">
+      <Link
+        href="/organizer/events"
+        className={`flex items-center gap-1.5 rounded-lg px-3 py-2 transition ${
+          isEvents
+            ? 'bg-stone-100 text-stone-900 font-bold'
+            : 'hover:bg-stone-50 hover:text-stone-900'
+        }`}
+      >
+        <Calendar className="h-4 w-4" />
+        <span>공연 관리</span>
+      </Link>
+      <Link
+        href="/organizer/events/new"
+        className={`flex items-center gap-1.5 rounded-lg px-3 py-2 transition ${
+          isNew
+            ? 'bg-stone-100 text-stone-900 font-bold'
+            : 'hover:bg-stone-50 hover:text-stone-900'
+        }`}
+      >
+        <PlusCircle className="h-4 w-4" />
+        <span>새 공연 개설</span>
+      </Link>
+    </nav>
+  );
+}
 
 export default function OrganizerLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
   const router = useRouter();
-
-  const isEvents = pathname === '/organizer/events';
-  const isNew = pathname === '/organizer/events/new';
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -34,7 +53,6 @@ export default function OrganizerLayout({
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-[#222] font-sans antialiased">
-      {/* ───── 주최자 상단 네비게이션 ───── */}
       <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/95 backdrop-blur-xs">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-6">
@@ -47,30 +65,10 @@ export default function OrganizerLayout({
               </span>
             </Link>
 
-            <nav className="hidden md:flex items-center gap-1 text-sm font-semibold text-stone-600">
-              <Link
-                href="/organizer/events"
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-2 transition ${
-                  isEvents
-                    ? 'bg-stone-100 text-stone-900 font-bold'
-                    : 'hover:bg-stone-50 hover:text-stone-900'
-                }`}
-              >
-                <Calendar className="h-4 w-4" />
-                <span>공연 관리</span>
-              </Link>
-              <Link
-                href="/organizer/events/new"
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-2 transition ${
-                  isNew
-                    ? 'bg-stone-100 text-stone-900 font-bold'
-                    : 'hover:bg-stone-50 hover:text-stone-900'
-                }`}
-              >
-                <PlusCircle className="h-4 w-4" />
-                <span>새 공연 개설</span>
-              </Link>
-            </nav>
+            {/* usePathname을 사용하는 컴포넌트를 Suspense로 감싸서 Prerender 에러 방지 */}
+            <Suspense fallback={<div className="w-40 h-8 bg-stone-100 rounded animate-pulse" />}>
+              <OrganizerNav />
+            </Suspense>
           </div>
 
           <div className="flex items-center gap-3">
@@ -95,7 +93,6 @@ export default function OrganizerLayout({
         </div>
       </header>
 
-      {/* ───── 본문 콘텐츠 ───── */}
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {children}
       </main>
