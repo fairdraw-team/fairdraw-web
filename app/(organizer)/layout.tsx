@@ -3,7 +3,7 @@
 import React, { Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '../lib/supabase';
 import { Calendar, PlusCircle, LogOut, ExternalLink } from 'lucide-react';
 
 function OrganizerNav() {
