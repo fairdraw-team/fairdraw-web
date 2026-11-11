@@ -19,13 +19,15 @@ import type {
 const won = (n: number) => `${n.toLocaleString('ko-KR')}원`;
 
 export default function EventDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams();
+  const id = params?.id as string;
   const router = useRouter();
 
   // 기본 공연 정보 및 탭 상태
   const [activeTab, setActiveTab] = useState<'info' | 'stats'>('info');
   const [ev, setEv] = useState<EventItem | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState<number | null>(null);
 
   // 동작 상태
   const [opening, setOpening] = useState(false);
@@ -42,27 +44,36 @@ export default function EventDetailPage() {
   const [seal, setSeal] = useState<SealInfo | null>(null);
   const [refreshingStats, setRefreshingStats] = useState(false);
 
+  // 클라이언트 마운트 후 시간 설정 (Prerender 에러 방지)
+  useEffect(() => {
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   // 기본 공연 정보 로드
   const loadEvent = useCallback(() => {
+    if (!id) return;
     apiFetch<EventItem>(`/api/events/${id}`)
       .then((data) => {
         setEv(data);
         if (data.status === 'closed') {
           apiFetch<SealInfo>(`/api/events/${id}/seal`)
             .then(setSeal)
-            .catch(() => {
-              // 봉인 정보가 아직 없을 수 있음
-            });
+            .catch(() => {});
         }
       })
       .catch((e: Error) => setError(e.message));
   }, [id]);
 
-  useEffect(loadEvent, [loadEvent]);
+  useEffect(() => {
+    loadEvent();
+  }, [loadEvent]);
 
   // 실시간 통계 로드 함수
   const loadStats = useCallback(
     async (isManual = false) => {
+      if (!id) return;
       if (isManual) setRefreshingStats(true);
       try {
         const statsData = await apiFetch<EventStats>(`/api/events/${id}/stats`);
@@ -79,6 +90,7 @@ export default function EventDetailPage() {
   // 응모자 명단 페이징 로드 함수
   const loadEntriesPage = useCallback(
     async (pageNum: number, append = false) => {
+      if (!id) return;
       setLoadingEntries(true);
       try {
         const res = await apiFetch<EntriesPageResponse>(
@@ -108,7 +120,7 @@ export default function EventDetailPage() {
 
       const interval = setInterval(() => {
         loadStats();
-      }, 30000); // 30초마다 자동 갱신
+      }, 30000);
 
       return () => clearInterval(interval);
     }
@@ -141,7 +153,7 @@ export default function EventDetailPage() {
   async function cancelEvent() {
     if (
       !confirm(
-        '현재 응모 진행 중인 공연을 취소(마감)하시겠습니까?\n\n* 관객 화면에서 응모 접수가 즉시 중단되며, 기존 응모자 데이터는 안전하게 보존됩니다.',
+        '현재 응모 진행 중인 공연을 취소(마감)하시겠습니까?\n\n관객 화면에서 응모 접수가 즉시 중단되며, 기존 응모자 데이터는 안전하게 보존됩니다.',
       )
     )
       return;
@@ -164,7 +176,7 @@ export default function EventDetailPage() {
   async function deleteEvent() {
     if (
       !confirm(
-        '이 공연을 삭제하여 휴지통으로 이동하시겠습니까?\n\n* 삭제된 공연은 좌측 [휴지통] 메뉴에서 언제든 다시 복구하시거나 완전히 영구 삭제하실 수 있습니다.',
+        '이 공연을 삭제하여 휴지통으로 이동하시겠습니까?\n\n삭제된 공연은 좌측 [휴지통] 메뉴에서 언제든 다시 복구하시거나 완전히 영구 삭제하실 수 있습니다.',
       )
     )
       return;
@@ -198,7 +210,6 @@ export default function EventDetailPage() {
         method: 'POST',
       });
       setSeal(sealResult);
-      // 이벤트 상태 closed로 갱신
       setEv((prev) => (prev ? { ...prev, status: 'closed' } : null));
       await loadStats();
       alert('성공적으로 응모가 마감되고 공정 추첨 명단이 봉인되었습니다!');
@@ -230,10 +241,9 @@ export default function EventDetailPage() {
     ['실제 공연 일시', ev.eventAt],
   ];
 
-  // 마감 시각 도달 여부 판별
-  const now = new Date().getTime();
+  // 마감 시각 도달 여부 판별 (now가 null이면 기본 false)
   const endAt = new Date(ev.entryEndAt).getTime();
-  const isAfterEnd = now >= endAt;
+  const isAfterEnd = now !== null ? now >= endAt : false;
 
   return (
     <div className="space-y-6">
@@ -245,10 +255,9 @@ export default function EventDetailPage() {
         <span>&larr; 주최 공연 목록으로 돌아가기</span>
       </Link>
 
-      {/* 상단 티켓링크식 히어로 배너 카드 */}
+      {/* 상단 히어로 배너 카드 */}
       <div className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-xs">
         <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-start sm:p-8">
-          {/* 좌측 포스터 */}
           <div className="relative aspect-[3/4] w-full shrink-0 overflow-hidden rounded-2xl border border-stone-200 bg-stone-100 shadow-sm sm:w-44">
             {ev.posterUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -260,13 +269,12 @@ export default function EventDetailPage() {
             )}
           </div>
 
-          {/* 우측 공연 개요 및 제어 */}
           <div className="flex flex-1 flex-col justify-between self-stretch">
             <div>
               <div className="flex flex-wrap items-center gap-2.5">
                 <StatusBadge status={ev.status} />
                 <span className="rounded-md bg-stone-100 px-2 py-0.5 text-xs font-bold text-stone-700">
-                  응모 마감 {timeLeft(ev.entryEndAt)}
+                  응모 마감 {now ? timeLeft(ev.entryEndAt, now) : '-'}
                 </span>
                 <span className="text-xs text-stone-400">
                   공연 식별 번호: {ev.id.slice(0, 8)}…
@@ -294,7 +302,7 @@ export default function EventDetailPage() {
               </div>
             </div>
 
-            {/* 상태별 제어 버튼 (헤더) */}
+            {/* 상태별 제어 버튼 */}
             <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-stone-100 pt-5">
               {ev.status === 'draft' && (
                 <>
@@ -369,11 +377,9 @@ export default function EventDetailPage() {
       )}
 
       {/* 봉인 완료 시 상단 SealBox 노출 */}
-      {seal && (
-        <SealBox seal={seal} className="my-2" />
-      )}
+      {seal && <SealBox seal={seal} className="my-2" />}
 
-      {/* 2주차 핵심: 탭 네비게이션 */}
+      {/* 탭 네비게이션 */}
       <div className="flex border-b border-stone-200">
         <button
           type="button"
@@ -404,7 +410,7 @@ export default function EventDetailPage() {
         </button>
       </div>
 
-      {/* 탭 1: 공연 기본 정보 (1주차 내용) */}
+      {/* 탭 1: 공연 기본 정보 */}
       {activeTab === 'info' && (
         <div className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-2">
@@ -502,10 +508,10 @@ export default function EventDetailPage() {
         </div>
       )}
 
-      {/* 탭 2: 실시간 응모 현황 및 봉인 (2주차 신설 탭) */}
+      {/* 탭 2: 실시간 응모 현황 및 봉인 */}
       {activeTab === 'stats' && (
         <div className="space-y-6">
-          {/* 상단 3대 주요 지표 카드 */}
+          {/* 상단 3대 지표 */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-xs">
               <div className="text-xs font-medium text-stone-500">총 응모 인원</div>
@@ -670,7 +676,7 @@ export default function EventDetailPage() {
             )}
           </section>
 
-          {/* 핵심 하이라이트: 응모 마감 및 명단 봉인 버튼 영역 */}
+          {/* 마감 및 명단 봉인 버튼 영역 */}
           {ev.status === 'open' && !seal && (
             <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-xs">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
