@@ -1,4 +1,5 @@
 'use client';
+
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
@@ -12,19 +13,37 @@ const POSTER_GRADIENTS = [
   'from-emerald-600 to-teal-400',
   'from-violet-600 to-pink-500',
 ];
-const gradientOf = (id: string) => POSTER_GRADIENTS[[...id].reduce((s, c) => s + c.charCodeAt(0), 0) % POSTER_GRADIENTS.length];
+const gradientOf = (id: string) =>
+  POSTER_GRADIENTS[
+    [...id].reduce((s, c) => s + c.charCodeAt(0), 0) % POSTER_GRADIENTS.length
+  ];
 
 export default function MyEventsPage() {
   const [events, setEvents] = useState<EventItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
-    apiFetch<EventItem[]>('/api/events')
-      .then(setEvents)
-      .catch((e: Error) => setError(e.message));
-    const t = setInterval(() => setNow(Date.now()), 60_000); // 1분마다 마감 시간 계산 갱신
-    return () => clearInterval(t);
+    // 1. 클라이언트 마운트 직후 시각 설정 및 1초 주기 타이머
+    setNow(Date.now());
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    // 2. 주최자 본인의 공연 목록 조회
+    async function loadEvents() {
+      try {
+        const data = await apiFetch<EventItem[]>('/api/organizer/events');
+        setEvents(data);
+      } catch (err: any) {
+        setError(err.message || '공연 목록을 불러오지 못했습니다.');
+        setEvents([]); // 에러 시 빈 배열로 안전하게 폴백
+      }
+    }
+
+    loadEvents();
+
+    return () => clearInterval(timer);
   }, []);
 
   return (
@@ -33,7 +52,9 @@ export default function MyEventsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-black tracking-tight text-stone-900 sm:text-3xl">주최 공연 관리</h1>
+            <h1 className="text-2xl font-black tracking-tight text-stone-900 sm:text-3xl">
+              주최 공연 관리
+            </h1>
             {events && (
               <span className="rounded-full bg-stone-200/80 px-2.5 py-0.5 text-xs font-bold text-stone-700">
                 총 {events.length}건
@@ -77,7 +98,7 @@ export default function MyEventsPage() {
         </div>
       )}
 
-      {/* 공연 카드 그리드 (티켓링크식 포스터형 카드) */}
+      {/* 공연 카드 그리드 */}
       <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {events?.map((ev) => {
           const totalSeats = (ev.sections ?? []).reduce((sum, s) => sum + s.capacity, 0);
@@ -103,11 +124,11 @@ export default function MyEventsPage() {
                     </div>
                   )}
 
-                  {/* 포스터 위 뱃지 오버레이 */}
+                  {/* 포스터 위 뱃지 오버레이 (now가 있을 때만 계산, 없을 땐 빈 텍스트) */}
                   <div className="absolute inset-x-3 top-3 flex items-center justify-between gap-2">
                     <StatusBadge status={ev.status} />
                     <span className="rounded-md bg-stone-950/75 px-2 py-0.5 text-[11px] font-bold text-white backdrop-blur-xs">
-                      응모 마감 {timeLeft(ev.entryEndAt, now)}
+                      응모 마감 {now ? timeLeft(ev.entryEndAt, now) : '-'}
                     </span>
                   </div>
                 </div>
