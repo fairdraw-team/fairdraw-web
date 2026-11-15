@@ -18,11 +18,11 @@ const gradientOf = (id: string) =>
 export default function PublicEventsPage() {
   const [events, setEvents] = useState<EventItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // 1. 초기값을 null로 설정하여 빌드 타임 사전 평가 방지
+  // 초기값을 null로 설정하여 빌드 타임 사전 평가 방지
   const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
-    // 2. 브라우저 마운트 직후 시각 초기화 및 1분 주기 갱신
+    // 브라우저 마운트 직후 시각 초기화 및 1분 주기 갱신
     setNow(Date.now());
     const t = setInterval(() => setNow(Date.now()), 60_000);
 
@@ -105,12 +105,15 @@ export default function PublicEventsPage() {
           </div>
         )}
 
-        {/* 티켓링크식 포스터 카드 갤러리 그리드 */}
+        {/* 포스터 카드 갤러리 그리드 */}
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
           {events?.map((ev) => (
-            <li key={ev.id} className="group flex flex-col justify-between rounded-2xl border border-stone-200 bg-white p-3 shadow-xs transition duration-200 hover:shadow-md">
-              <div>
-                {/* 포스터 썸네일 프레임 (3:4 비율) */}
+            <li
+              key={ev.id}
+              className="group flex flex-col justify-between rounded-2xl border border-stone-200 bg-white p-3 shadow-xs transition duration-200 hover:shadow-md"
+            >
+              {/* 포스터 및 메타데이터 클릭 시 공연 상세(/events/[id])로 이동 */}
+              <Link href={`/events/${ev.id}`} className="block">
                 <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl border border-stone-200 bg-stone-100 shadow-xs">
                   {ev.posterUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -152,15 +155,21 @@ export default function PublicEventsPage() {
                     <span className="font-bold text-stone-900">{ev.price.toLocaleString('ko-KR')}원~</span>
                   </div>
                 </div>
-              </div>
+              </Link>
 
-              {/* 연석 팀 만들기 액션 버튼 */}
-              <div className="mt-3 pt-2 border-t border-stone-100">
+              {/* 하단 액션 버튼: 개인 응모(상세) & 연석 팀 만들기 */}
+              <div className="mt-3 grid grid-cols-2 gap-1.5 border-t border-stone-100 pt-2">
+                <Link
+                  href={`/events/${ev.id}`}
+                  className="block rounded-xl bg-stone-900 py-2 text-center text-xs font-bold text-white transition hover:bg-stone-800"
+                >
+                  응모하기
+                </Link>
                 <Link
                   href={`/events/${ev.id}/team/new`}
-                  className="block w-full rounded-xl bg-stone-900 py-2 text-center text-xs font-bold text-white transition hover:bg-stone-800"
+                  className="block rounded-xl border border-stone-200 bg-stone-50 py-2 text-center text-xs font-bold text-stone-700 transition hover:bg-stone-100"
                 >
-                  연석 팀 만들기 &rarr;
+                  팀 만들기
                 </Link>
               </div>
             </li>

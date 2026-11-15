@@ -3,6 +3,30 @@
 
 export type EventStatus = 'draft' | 'open' | 'closed' | 'drawn' | 'paying' | 'done';
 
+export interface MyEntryAllocation {
+  sectionId: string;
+  sectionName?: string;
+  ballots: number;
+}
+
+export interface MyEntry {
+  id: string;
+  eventId: string;
+  status: 'active' | 'cancelled';
+  createdAt: string;
+  allocations: MyEntryAllocation[];
+  team?: {
+    id: string;
+    name?: string;
+    sectionId?: string;
+    members?: {
+      id: string;
+      userName: string;
+      isLeader?: boolean;
+    }[];
+  } | null;
+}
+
 export interface Section {
   id: string;
   name: string;
@@ -25,6 +49,7 @@ export interface EventItem {
   status: EventStatus;
   sections?: Section[];
   deletedAt?: string | null; // 휴지통 삭제 일시 (있으면 휴지통 보관 상태)
+  paymentDueAt?: string;
 }
 
 export type EventInput = Omit<EventItem, 'id' | 'status' | 'sections'>;
@@ -112,4 +137,48 @@ export interface SealInfo {
 export interface ApiErrorBody {
   code: string;
   message: string;
+}
+
+// --- 3주차: 추첨 결과 및 검증 타입 ---
+
+export interface MyDrawResult {
+  eventId: string;
+  result: 'won' | 'waitlisted' | 'lost';
+  sectionId: string | null;
+  sectionName: string | null;
+  waitlistRank: number | null;
+  teamId: string | null;
+  ballotIds: string[];
+}
+
+export interface DrawSectionStat {
+  sectionId: string;
+  name: string;
+  capacity: number;
+  ballots: number;
+  won: number;
+  waitlisted: number;
+}
+
+export interface DrawInfo {
+  eventId: string;
+  rosterHash: string;
+  sealedAt: string;
+  ballotCount: number;
+  seed: string;
+  drawnAt: string;
+  drawnAtMillis: number;
+  sections: DrawSectionStat[];
+}
+
+export interface PublicBallot {
+  order: number;
+  ballotId: string;
+  sectionName: string;
+  result: 'won' | 'waitlisted' | null;
+}
+
+export interface PublicBallotsResponse {
+  eventId: string;
+  ballots: PublicBallot[];
 }

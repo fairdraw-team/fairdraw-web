@@ -1,0 +1,35 @@
+{
+  "eventId": "1",
+  "rosterHash": "3fa98e4f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c21",
+  "sealedAt": "2026-11-05T09:00:00Z",
+  "ballotCount": 90,
+  "seed": "8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c21e3fa98e4f1a2b3c4d5e6f7",
+  "drawnAt": "2026-11-05T09:05:00.123Z",
+  "drawnAtMillis": 1793869500123,
+  "sections": [
+    {
+      "sectionId": "sec-a",
+      "name": "A",
+      "capacity": 5,
+      "ballots": 45,
+      "won": 5,
+      "waitlisted": 1
+    },
+    {
+      "sectionId": "sec-b",
+      "name": "B",
+      "capacity": 5,
+      "ballots": 35,
+      "won": 5,
+      "waitlisted": 1
+    },
+    {
+      "sectionId": "sec-c",
+      "name": "C",
+      "capacity": 10,
+      "ballots": 10,
+      "won": 10,
+      "waitlisted": 0
+    }
+  ]
+}

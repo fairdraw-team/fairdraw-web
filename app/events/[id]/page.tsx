@@ -1,9 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { supabase } from '../../lib/supabase';
-import { formatKST } from '../../lib/format';
+import { Suspense, use, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { apiFetch } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
+import { formatKst } from '@/lib/datetime';
+import { isAtLeast } from '@/lib/eventStatus';
+import { DrawBox } from '@/components/DrawBox';
+import type { EventItem, SealInfo as ApiSealInfo } from '@/types/api';
 import {
   Search,
   Share2,
@@ -33,28 +37,27 @@ interface EventDetail {
   title: string;
   place: string;
   status: 'draft' | 'open' | 'closed' | 'drawn' | 'paying' | 'done';
-  startAt: string; // UTC ISO 문자열
-  endAt: string; // UTC ISO 문자열
-  closeAt: string; // 응모 마감 시각 (UTC ISO 문자열)
-  ballotsPerPerson: number; // 1인당 제비 수 (기본 3)
+  startAt: string;
+  endAt: string;
+  closeAt: string;
+  ballotsPerPerson: number;
   sections: SectionInfo[];
 }
 
 interface SealInfo {
   sealedAt: string;
   totalBallots: number;
-  rosterHash: string; // 64자 SHA-256 해시
+  rosterHash: string;
 }
 
-// 2주차 모의 데이터 (백엔드 연동 전 기본값)
 const MOCK_EVENT: EventDetail = {
   id: '1',
   title: '2026 가을 대동제 아티스트 특별 콘서트',
   place: '야외 특설 노천극장',
-  status: 'open', // 상태 테스트: 'open' 또는 'closed'
+  status: 'open', // 상태 테스트: 'open' | 'closed' | 'drawn'
   startAt: '2026-11-06T10:00:00Z',
   endAt: '2026-11-07T13:00:00Z',
-  closeAt: '2026-11-05T09:00:00Z', // 마감 일시
+  closeAt: '2026-11-05T09:00:00Z',
   ballotsPerPerson: 3,
   sections: [
     { id: 'A', name: 'A구역', capacity: 130, price: '무료 (응모)', desc: '스탠딩 중앙' },
@@ -75,13 +78,16 @@ const NAV_SUB = ['랭킹', '지역', '이벤트', '기획전', 'PAYCO VIP ZONE']
 const TABS = ['상세정보', '구역 및 제비 안내', '연석 팀 안내', '공지사항'];
 const MONO = "font-['ui-monospace','SFMono-Regular','Menlo','Consolas',monospace]";
 
-export default function EventDetailPage() {
+function EventDetailContent({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id: eventId } = use(params);
   const router = useRouter();
-  const params = useParams();
-  const eventId = (params?.id as string) || '1';
 
-  const [event] = useState<EventDetail>(MOCK_EVENT);
-  const [seal] = useState<SealInfo>(MOCK_SEAL);
+  const [event, setEvent] = useState<EventDetail>(MOCK_EVENT);
+  const [seal, setSeal] = useState<SealInfo | null>(null);
   const [activeTab, setActiveTab] = useState<string>('상세정보');
 
   // 마감까지 남은 시간 (문자열)
@@ -92,10 +98,62 @@ export default function EventDetailPage() {
   const [copied, setCopied] = useState<boolean>(false);
   const [showHashHelp, setShowHashHelp] = useState<boolean>(false);
 
+  // 백엔드 공연 상세 및 봉인 정보 로드 (실패 시 Mock 유지)
+  useEffect(() => {
+    let ignore = false;
+
+    apiFetch<EventItem>(`/api/public/events/${eventId}`, { auth: false })
+      .catch(() => apiFetch<EventItem>(`/api/events/${eventId}`, { auth: false }))
+      .then((data) => {
+        if (ignore || !data) return;
+        setEvent({
+          id: data.id,
+          title: data.title,
+          place: data.venue,
+          status: data.status,
+          startAt: data.eventAt,
+          endAt: data.eventAt,
+          closeAt: data.entryEndAt,
+          ballotsPerPerson: data.ballotsPerUser || 3,
+          sections: (data.sections ?? []).map((s) => ({
+            id: s.id,
+            name: s.name,
+            capacity: s.capacity,
+            price: `${(s.price ?? data.price).toLocaleString('ko-KR')}원`,
+            desc: '추첨 좌석 구역',
+          })),
+        });
+
+        if (data.status !== 'draft' && data.status !== 'open') {
+          apiFetch<ApiSealInfo>(`/api/public/events/${eventId}/seal`, { auth: false })
+            .then((s) => {
+              if (!ignore && s) {
+                const raw = s as unknown as Record<string, unknown>;
+                setSeal({
+                  sealedAt: String(raw.sealedAt ?? ''),
+                  totalBallots: Number(raw.totalBallots ?? raw.ballotCount ?? 0),
+                  rosterHash: String(raw.rosterHash ?? raw.hash ?? ''),
+                });
+              }
+            })
+            .catch(() => {
+              if (!ignore) setSeal(MOCK_SEAL);
+            });
+        }
+      })
+      .catch(() => {
+        // 백엔드 미응답 시 기존 MOCK_EVENT 유지
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [eventId]);
+
   // 1분(60초)마다 마감 시간 계산 갱신
   useEffect(() => {
     function calculateTimeLeft() {
-      const now = new Date().getTime();
+      const now = Date.now();
       const closeTime = new Date(event.closeAt).getTime();
       const diff = closeTime - now;
 
@@ -124,7 +182,6 @@ export default function EventDetailPage() {
       data: { user },
     } = await supabase.auth.getUser();
 
-    // 로그인하지 않은 경우 ?next=/events/{id}를 붙여 /login으로 이동
     if (!user) {
       router.push(`/login?next=/events/${eventId}`);
       return;
@@ -133,14 +190,15 @@ export default function EventDetailPage() {
     if (type === 'individual') {
       router.push(`/events/${eventId}/enter`);
     } else {
-      router.push(`/events/${eventId}/team`); // 프론트B 팀 화면으로 이동
+      router.push(`/events/${eventId}/team/new`);
     }
   };
 
   // 해시 복사 핸들러
   const handleCopyHash = async () => {
+    const targetHash = seal?.rosterHash || MOCK_SEAL.rosterHash;
     try {
-      await navigator.clipboard.writeText(seal.rosterHash);
+      await navigator.clipboard.writeText(targetHash);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -148,8 +206,10 @@ export default function EventDetailPage() {
     }
   };
 
+  const isDrawn = isAtLeast(event.status, 'drawn');
   const isClosed = event.status !== 'open' || isPastClose;
   const isOpenNow = event.status === 'open' && !isPastClose;
+  const displaySeal = seal || MOCK_SEAL;
 
   const metaRows: { label: string; node: React.ReactNode }[] = [
     {
@@ -161,8 +221,8 @@ export default function EventDetailPage() {
         </span>
       ),
     },
-    { label: '공연일시', node: <span className="font-[600]">{formatKST(event.startAt)}</span> },
-    { label: '응모 마감', node: <span className="font-[700] text-[#E5372B]">{formatKST(event.closeAt)}</span> },
+    { label: '공연일시', node: <span className="font-[600]">{formatKst(event.startAt)}</span> },
+    { label: '응모 마감', node: <span className="font-[700] text-[#E5372B]">{formatKst(event.closeAt)}</span> },
     { label: '남은 시간', node: <span className="font-[600] text-[#3B73E8]">{timeLeftText}</span> },
     {
       label: '1인당 제비',
@@ -214,7 +274,7 @@ export default function EventDetailPage() {
         <div className="flex items-center gap-[24px]">
           <button
             type="button"
-            onClick={() => router.push('/')}
+            onClick={() => router.push('/events')}
             className="bg-transparent border-0 p-[0px] [font-family:inherit] cursor-pointer text-[34px] leading-none tracking-[-0.025em] text-[#111]"
           >
             Fair<span className="font-[900]">Draw</span>
@@ -287,12 +347,14 @@ export default function EventDetailPage() {
               </span>
               <span
                 className={`rounded-full border px-[10px] py-[2px] text-[11px] font-[600] ${
-                  isOpenNow
-                    ? 'border-[#1E9E63] text-[#1E9E63]'
-                    : 'border-[#bbb] text-[#888]'
+                  isDrawn
+                    ? 'border-[#3B73E8] bg-[#EEF4FF] text-[#3B73E8]'
+                    : isOpenNow
+                      ? 'border-[#1E9E63] text-[#1E9E63]'
+                      : 'border-[#bbb] text-[#888]'
                 }`}
               >
-                {isOpenNow ? '응모 진행중' : '응모 마감'}
+                {isDrawn ? '추첨 완료' : isOpenNow ? '응모 진행중' : '응모 마감'}
               </span>
             </div>
 
@@ -327,7 +389,9 @@ export default function EventDetailPage() {
                     {event.sections.map((sec, i) => (
                       <tr
                         key={sec.id}
-                        className={`hover:bg-[#fafafa] ${i < event.sections.length - 1 ? 'border-b border-[#eee]' : ''}`}
+                        className={`hover:bg-[#fafafa] ${
+                          i < event.sections.length - 1 ? 'border-b border-[#eee]' : ''
+                        }`}
                       >
                         <td className="px-[12px] py-[8px] font-[700] text-[#111]">{sec.name}</td>
                         <td className="px-[12px] py-[8px] text-[#666]">{sec.desc}</td>
@@ -340,32 +404,61 @@ export default function EventDetailPage() {
               </div>
             </div>
 
-            {/* 응모하기 / 팀으로 응모하기 */}
-            <div className="mt-[24px] flex flex-col gap-[8px] min-[640px]:flex-row">
-              <button
-                type="button"
-                onClick={() => handleProceed('individual')}
-                disabled={isClosed}
-                className="border-0 [font-family:inherit] flex h-[56px] flex-1 items-center justify-center gap-[8px] rounded-[3px] bg-[#F0352A] px-[16px] text-[15px] font-[700] text-[#fff] transition hover:bg-[#d92a20] disabled:cursor-not-allowed disabled:bg-[#ccc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F0352A]"
-              >
-                <Ticket className="h-[16px] w-[16px]" />
-                {isClosed ? '응모가 마감되었습니다' : '응모하기 (개인 제비 배분)'}
-              </button>
+            {/* 응모하기 / 팀으로 응모하기 또는 추첨 완료 결과·검증 버튼 */}
+            {isDrawn ? (
+              <div className="mt-[24px] space-y-[10px]">
+                <div className="flex items-center gap-[6px] rounded-[4px] border border-[#C7DCFF] bg-[#F2F7FF] px-[14px] py-[10px] text-[12px] font-[700] text-[#1D5FD6]">
+                  <ShieldCheck className="h-[16px] w-[16px] shrink-0" />
+                  추첨이 완료되었습니다. 당첨 결과 확인 및 공개 검증이 가능합니다.
+                </div>
+                <div className="flex flex-col gap-[8px] min-[640px]:flex-row">
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/events/${eventId}/result`)}
+                    className="border-0 [font-family:inherit] flex h-[56px] flex-1 cursor-pointer items-center justify-center gap-[8px] rounded-[3px] bg-[#111] px-[16px] text-[15px] font-[700] text-[#fff] transition hover:bg-[#333]"
+                  >
+                    <Ticket className="h-[16px] w-[16px]" />
+                    내 결과 보기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/events/${eventId}/verify`)}
+                    className="bg-[#fff] [font-family:inherit] flex h-[56px] cursor-pointer items-center justify-center gap-[8px] rounded-[3px] border border-[#222] px-[24px] text-[14px] font-[700] text-[#222] transition hover:bg-[#f6f6f6]"
+                  >
+                    <ShieldCheck className="h-[16px] w-[16px]" />
+                    추첨 검증하기
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="mt-[24px] flex flex-col gap-[8px] min-[640px]:flex-row">
+                  <button
+                    type="button"
+                    onClick={() => handleProceed('individual')}
+                    disabled={isClosed}
+                    className="border-0 [font-family:inherit] flex h-[56px] flex-1 items-center justify-center gap-[8px] rounded-[3px] bg-[#F0352A] px-[16px] text-[15px] font-[700] text-[#fff] transition hover:bg-[#d92a20] disabled:cursor-not-allowed disabled:bg-[#ccc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F0352A]"
+                  >
+                    <Ticket className="h-[16px] w-[16px]" />
+                    {isClosed ? '응모가 마감되었습니다' : '응모하기 (개인 제비 배분)'}
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => handleProceed('team')}
-                disabled={isClosed}
-                className="bg-[#fff] [font-family:inherit] flex h-[56px] items-center justify-center gap-[8px] rounded-[3px] border border-[#222] px-[24px] text-[14px] font-[700] text-[#222] transition hover:bg-[#f6f6f6] disabled:cursor-not-allowed disabled:border-[#ccc] disabled:text-[#999] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#222]"
-              >
-                <Users className="h-[16px] w-[16px]" />
-                팀으로 응모하기 (연석)
-              </button>
-            </div>
-            {isClosed && (
-              <p className="m-[0px] mt-[8px] text-[12px] font-[700] text-[#E5372B]">
-                * 응모 마감 시각이 지나 신규 응모 및 팀 합류가 불가능합니다.
-              </p>
+                  <button
+                    type="button"
+                    onClick={() => handleProceed('team')}
+                    disabled={isClosed}
+                    className="bg-[#fff] [font-family:inherit] flex h-[56px] items-center justify-center gap-[8px] rounded-[3px] border border-[#222] px-[24px] text-[14px] font-[700] text-[#222] transition hover:bg-[#f6f6f6] disabled:cursor-not-allowed disabled:border-[#ccc] disabled:text-[#999] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#222]"
+                  >
+                    <Users className="h-[16px] w-[16px]" />
+                    팀으로 응모하기 (연석)
+                  </button>
+                </div>
+                {isClosed && (
+                  <p className="m-[0px] mt-[8px] text-[12px] font-[700] text-[#E5372B]">
+                    * 응모 마감 시각이 지나 신규 응모 및 팀 합류가 불가능합니다.
+                  </p>
+                )}
+              </>
             )}
           </div>
         </section>
@@ -392,9 +485,9 @@ export default function EventDetailPage() {
 
             <div className="mt-[16px] grid grid-cols-1 gap-[12px] text-[12px] min-[640px]:grid-cols-3">
               {[
-                ['응모 상태', '응모 마감됨', 'text-[#1E9E63]'],
-                ['총 봉인 제비 수', `총 ${seal.totalBallots.toLocaleString()}장`, 'text-[#111]'],
-                ['봉인 일시', formatKST(seal.sealedAt), 'text-[#111]'],
+                ['응모 상태', isDrawn ? '봉인 및 추첨 완료' : '응모 마감됨', 'text-[#1E9E63]'],
+                ['총 봉인 제비 수', `총 ${displaySeal.totalBallots.toLocaleString()}장`, 'text-[#111]'],
+                ['봉인 일시', formatKst(displaySeal.sealedAt), 'text-[#111]'],
               ].map(([k, v, color]) => (
                 <div key={k} className="rounded-[4px] border border-[#e5e5e5] px-[14px] py-[12px]">
                   <span className="block text-[#777]">{k}</span>
@@ -410,7 +503,7 @@ export default function EventDetailPage() {
                 <code
                   className={`rounded-[3px] bg-[#fdeeed] px-[8px] py-[2px] text-[12px] font-[700] text-[#E5372B] ${MONO}`}
                 >
-                  {seal.rosterHash.slice(0, 8)}...{seal.rosterHash.slice(-4)}
+                  {displaySeal.rosterHash.slice(0, 8)}...{displaySeal.rosterHash.slice(-4)}
                 </code>
               </div>
               <button
@@ -430,6 +523,13 @@ export default function EventDetailPage() {
               </button>
             </div>
           </section>
+        )}
+
+        {/* ───── 공개 추첨 정보 상자 (봉인 상자 바로 아래 차례로 표시) ───── */}
+        {isDrawn && (
+          <div className="mt-[20px]">
+            <DrawBox eventId={eventId} />
+          </div>
         )}
 
         {/* ───── 지문 설명 모달 ───── */}
@@ -507,7 +607,7 @@ export default function EventDetailPage() {
                   진행됩니다. 응모 마감 전까지 언제 신청하셔도 당첨 확률은 동일합니다.
                 </p>
                 <div className="mt-[16px] rounded-[4px] bg-[#f5f5f5] px-[14px] py-[12px] text-[12px] text-[#555]">
-                  * 1인당 총 {event.ballotsPerPerson}장의 제비를 원하는 구역(A~D)에 자유롭게 배분하여 당첨 확률을 조율할 수
+                  * 1인당 총 {event.ballotsPerPerson}장의 제비를 원하는 구역에 자유롭게 배분하여 당첨 확률을 조율할 수
                   있습니다.
                 </div>
               </div>
@@ -517,11 +617,11 @@ export default function EventDetailPage() {
               <div>
                 <h3 className="m-[0px] text-[15px] font-[700] text-[#111]">연석 팀(Team) 응모 규칙</h3>
                 <div className="mt-[12px] space-y-[4px] text-[#555]">
-                  <p className="m-[0px]">* 친구와 나란히 앉기를 원하시는 경우 &apos;팀으로 응모하기&apos;를 이용해주세요.</p>
+                  <p className="m-[0px]">친구와 나란히 앉기를 원하시는 경우 &apos;팀으로 응모하기&apos;를 이용해주세요.</p>
                   <p className="m-[0px]">
                     * 팀은 <b className="font-[700] text-[#111]">단 하나의 구역에만</b> 제비를 모아서 응모해야 합니다.
                   </p>
-                  <p className="m-[0px]">* 추첨 시 팀원 전원 당첨 또는 전원 탈락으로 함께 처리됩니다.</p>
+                  <p className="m-[0px]">추첨 시 팀원 전원 당첨 또는 전원 탈락으로 함께 처리됩니다.</p>
                 </div>
               </div>
             )}
@@ -534,7 +634,7 @@ export default function EventDetailPage() {
                   본인인증을 완료한 1인 1계정만 응모할 수 있으며 양도가 불가능합니다.
                 </div>
                 <div className="mt-[16px] space-y-[4px] text-[#555]">
-                  <p className="m-[0px]">* 마감 이후에는 응모 취소나 팀원 변경이 불가능합니다.</p>
+                  <p className="m-[0px]">마감 이후에는 응모 취소나 팀원 변경이 불가능합니다.</p>
                   <p className="m-[0px]">
                     * 당첨자 발표 후 기한 내 결제가 완료되지 않으면 차순위자에게 기회가 넘어갑니다.
                   </p>
@@ -551,5 +651,23 @@ export default function EventDetailPage() {
         </section>
       </main>
     </div>
+  );
+}
+
+export default function EventDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-[1000px] px-[16px] py-[96px] text-center text-sm text-[#888]">
+          공연 상세 정보를 불러오는 중입니다…
+        </div>
+      }
+    >
+      <EventDetailContent params={params} />
+    </Suspense>
   );
 }

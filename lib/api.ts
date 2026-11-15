@@ -1,7 +1,9 @@
-// 백엔드 호출 공통 함수 (임시본)
-// ⚠️ 원래 이 파일은 프론트A 담당(src/lib/api.ts)이다. 팀 저장소에 A 버전이 머지되면
-//    이 파일은 버리고, 아래 "USE_MOCK 분기" 3줄만 A 버전 맨 앞에 합친다(가이드: mock은 프론트A와 같이 넣기).
+// 백엔드 호출 공통 함수
 import { mockFetch } from './mock';
+import { supabase } from './supabase';
+import drawMeMock from '../mocks/draw-me.json';
+import drawInfoMock from '../mocks/draw.json';
+import drawBallotsMock from '../mocks/draw-ballots.json';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? '';
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
@@ -16,17 +18,37 @@ export class ApiError extends Error {
   }
 }
 
-// TODO(프론트A 머지 후): supabase.auth.getSession()의 access_token으로 교체
 async function getToken(): Promise<string | null> {
-  return null;
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return session?.access_token ?? null;
 }
 
 type ApiOptions = RequestInit & { auth?: boolean };
 
-export async function apiFetch<T>(path: string, { auth = true, headers, ...init }: ApiOptions = {}): Promise<T> {
+export async function apiFetch<T>(
+  path: string,
+  { auth = true, headers, ...init }: ApiOptions = {},
+): Promise<T> {
   // USE_MOCK 분기 — 백엔드 없이 화면 작업할 때
   if (USE_MOCK) {
-    return mockFetch<T>(path, init.method ?? 'GET', typeof init.body === 'string' ? init.body : undefined);
+    // 3주차 추첨·검증 Mock 응답 분기
+    if (/\/api\/events\/[^/]+\/draw\/me$/.test(path)) {
+      return drawMeMock as unknown as T;
+    }
+    if (/\/api\/public\/events\/[^/]+\/draw\/ballots$/.test(path)) {
+      return drawBallotsMock as unknown as T;
+    }
+    if (/\/api\/public\/events\/[^/]+\/draw$/.test(path)) {
+      return drawInfoMock as unknown as T;
+    }
+
+    return mockFetch<T>(
+      path,
+      init.method ?? 'GET',
+      typeof init.body === 'string' ? init.body : undefined,
+    );
   }
 
   const token = auth ? await getToken() : null;
@@ -45,7 +67,11 @@ export async function apiFetch<T>(path: string, { auth = true, headers, ...init 
   }
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    throw new ApiError(body?.code ?? 'UNKNOWN', body?.message ?? `요청 실패 (${res.status})`, res.status);
+    throw new ApiError(
+      body?.code ?? 'UNKNOWN',
+      body?.message ?? `요청 실패 (${res.status})`,
+      res.status,
+    );
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
