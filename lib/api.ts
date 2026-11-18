@@ -2,6 +2,7 @@
 // ⚠️ 원래 이 파일은 프론트A 담당(src/lib/api.ts)이다. 팀 저장소에 A 버전이 머지되면
 //    이 파일은 버리고, 아래 "USE_MOCK 분기" 3줄만 A 버전 맨 앞에 합친다(가이드: mock은 프론트A와 같이 넣기).
 import { mockFetch } from './mock';
+import { supabase } from '@/app/lib/supabase';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? '';
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
@@ -16,9 +17,11 @@ export class ApiError extends Error {
   }
 }
 
-// TODO(프론트A 머지 후): supabase.auth.getSession()의 access_token으로 교체
 async function getToken(): Promise<string | null> {
-  return null;
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return session?.access_token ?? null;
 }
 
 type ApiOptions = RequestInit & { auth?: boolean };

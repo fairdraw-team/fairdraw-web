@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { Suspense, use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
@@ -8,7 +8,7 @@ import type { Team, EventItem, SealInfo } from '@/types/api';
 import { SealBox } from '@/components/SealBox';
 import { formatKst } from '@/lib/datetime';
 
-export default function TeamDetailPage({
+function TeamDetailContent({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -39,9 +39,12 @@ export default function TeamDetailPage({
           const eventData = await apiFetch<EventItem>(`/api/events/${teamData.eventId}`);
           if (!ignore) {
             setEvent(eventData);
-            if (eventData.status === 'closed') {
+            if (eventData.status !== 'open' && eventData.status !== 'draft') {
               try {
-                const sealData = await apiFetch<SealInfo>(`/api/events/${teamData.eventId}/seal`);
+                const sealData = await apiFetch<SealInfo>(
+                  `/api/public/events/${teamData.eventId}/seal`,
+                  { auth: false },
+                );
                 if (!ignore) setSeal(sealData);
               } catch {
                 // 봉인 정보가 아직 없으면 무시
@@ -104,7 +107,7 @@ export default function TeamDetailPage({
 
   const handleLeaveTeam = async () => {
     if (!team) return;
-    const isLeader = true; // 현재 접속자(모의)
+    const isLeader = Boolean(team.inviteCode);
     const confirmMessage = isLeader
       ? '팀장님이 탈퇴하시면 팀이 즉시 해체되며, 함께 합류한 팀원 전원의 응모가 취소됩니다. 정말로 탈퇴하시겠습니까?'
       : '연석 팀에서 탈퇴하시겠습니까? 탈퇴 시 본인의 해당 공연 응모 내역도 함께 취소됩니다.';
@@ -159,7 +162,7 @@ export default function TeamDetailPage({
   }
 
   const isFull = team.members.length >= team.maxMembers;
-  const isClosed = event?.status === 'closed';
+  const isClosed = Boolean(event && event.status !== 'open' && event.status !== 'draft');
 
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100 py-10 px-4 sm:px-6 lg:px-8">
@@ -300,5 +303,26 @@ export default function TeamDetailPage({
         )}
       </div>
     </main>
+  );
+}
+
+export default function TeamDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center p-4">
+          <div className="flex items-center gap-3 text-neutral-400 text-sm">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-400 border-t-transparent" />
+            팀 화면을 불러오는 중입니다...
+          </div>
+        </main>
+      }
+    >
+      <TeamDetailContent params={params} />
+    </Suspense>
   );
 }

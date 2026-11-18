@@ -6,7 +6,7 @@
     "posterUrl": "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=80",
     "eventAt": "2026-12-20T19:00:00+09:00",
     "entryStartAt": "2026-11-09T10:00:00+09:00",
-    "entryEndAt": "2026-12-01T23:59:00+09:00",
+    "entryEndAt": "2026-11-18T18:00:00+09:00",
     "paymentDeadlineAt": "2026-12-05T23:59:00+09:00",
     "price": 30000,
     "ballotsPerUser": 3,
@@ -34,6 +34,25 @@
     "sections": [
       { "id": "mock-sec-d", "name": "스탠딩 A", "capacity": 120, "price": 45000 },
       { "id": "mock-sec-e", "name": "스탠딩 B", "capacity": 80, "price": 40000 }
+    ]
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000103",
+    "title": "2026 연말 심포니 갈라 콘서트",
+    "venue": "예술의전당 콘서트홀",
+    "posterUrl": "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=800&auto=format&fit=crop&q=80",
+    "eventAt": "2026-12-31T20:00:00+09:00",
+    "entryStartAt": "2026-11-01T10:00:00+09:00",
+    "entryEndAt": "2026-11-18T18:00:00+09:00",
+    "paymentDeadlineAt": "2026-11-25T23:59:00+09:00",
+    "price": 60000,
+    "ballotsPerUser": 3,
+    "maxTeamSize": 2,
+    "status": "paying",
+    "sections": [
+      { "id": "mock-sec-f", "name": "VIP석", "capacity": 40, "price": 120000 },
+      { "id": "mock-sec-g", "name": "R석", "capacity": 80, "price": 90000 },
+      { "id": "mock-sec-h", "name": "S석", "capacity": 120, "price": null }
     ]
   }
 ]

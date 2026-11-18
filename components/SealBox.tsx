@@ -12,9 +12,13 @@ interface SealBoxProps {
 export function SealBox({ seal, className = '' }: SealBoxProps) {
   const [copied, setCopied] = useState(false);
 
+  const displayHash = seal.rosterHash || seal.hash || '';
+  const displayBallots = seal.ballotCount ?? seal.totalBallots ?? 0;
+
   const handleCopyHash = async () => {
+    if (!displayHash) return;
     try {
-      await navigator.clipboard.writeText(seal.hash);
+      await navigator.clipboard.writeText(displayHash);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -45,16 +49,24 @@ export function SealBox({ seal, className = '' }: SealBoxProps) {
         <div className="rounded-xl bg-neutral-900/80 p-3.5 border border-neutral-800">
           <div className="text-xs text-neutral-400">봉인된 총 제비 수</div>
           <div className="mt-1 text-2xl font-bold text-emerald-400">
-            {seal.totalBallots.toLocaleString()}
+            {displayBallots.toLocaleString()}
             <span className="ml-1 text-sm font-normal text-neutral-400">장</span>
           </div>
         </div>
         <div className="rounded-xl bg-neutral-900/80 p-3.5 border border-neutral-800">
-          <div className="text-xs text-neutral-400">확정 응모 건수</div>
-          <div className="mt-1 text-2xl font-bold text-neutral-100">
-            {seal.totalEntries.toLocaleString()}
-            <span className="ml-1 text-sm font-normal text-neutral-400">건</span>
+          <div className="text-xs text-neutral-400">
+            {seal.totalEntries != null ? '확정 응모 건수' : '무결성 검증 상태'}
           </div>
+          {seal.totalEntries != null ? (
+            <div className="mt-1 text-2xl font-bold text-neutral-100">
+              {seal.totalEntries.toLocaleString()}
+              <span className="ml-1 text-sm font-normal text-neutral-400">건</span>
+            </div>
+          ) : (
+            <div className="mt-1 text-lg font-bold text-emerald-300">
+              SHA-256 잠금 완료
+            </div>
+          )}
         </div>
       </div>
 
@@ -66,7 +78,8 @@ export function SealBox({ seal, className = '' }: SealBoxProps) {
           <button
             type="button"
             onClick={handleCopyHash}
-            className="inline-flex items-center gap-1 rounded-md bg-neutral-800 px-2.5 py-1 text-xs font-medium text-neutral-200 transition hover:bg-neutral-700"
+            disabled={!displayHash}
+            className="inline-flex items-center gap-1 rounded-md bg-neutral-800 px-2.5 py-1 text-xs font-medium text-neutral-200 transition hover:bg-neutral-700 disabled:opacity-40"
           >
             {copied ? (
               <span className="text-emerald-400 font-semibold">복사 완료!</span>
@@ -76,7 +89,7 @@ export function SealBox({ seal, className = '' }: SealBoxProps) {
           </button>
         </div>
         <div className="rounded-lg bg-neutral-950 p-3 font-mono text-xs break-all text-neutral-300 border border-neutral-800 select-all leading-relaxed">
-          {seal.hash}
+          {displayHash}
         </div>
         <p className="mt-2 text-xs leading-normal text-neutral-400">
           이 지문은 응모 마감 순간의 모든 제비 명단을 결합하여 생성된 64자리 위변조 방지 식별값입니다.

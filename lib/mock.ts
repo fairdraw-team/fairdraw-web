@@ -10,6 +10,10 @@ import type {
   EventEntry,
   EntriesPageResponse,
   SealInfo,
+  BookingPaymentStatus,
+  PaymentBookingItem,
+  SectionPaymentStat,
+  EventPaymentSummary,
 } from '@/types/api';
 import { ApiError } from './api';
 
@@ -17,6 +21,7 @@ const KEY_EVENTS = 'fairdraw-mock-events';
 const KEY_TEAMS = 'fairdraw-mock-teams';
 const KEY_ENTRIES = 'fairdraw-mock-entries';
 const KEY_SEALS = 'fairdraw-mock-seals';
+const KEY_PAYMENTS = 'fairdraw-mock-payments';
 
 // 초대 코드용 32자 문자열 (헷갈리는 0, O, 1, I 배제)
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -47,8 +52,21 @@ function generateSha256Hex(seedStr: string): string {
 }
 
 function loadEvents(): EventItem[] {
+  const seedEvents = seed as EventItem[];
   const saved = localStorage.getItem(KEY_EVENTS);
-  return saved ? JSON.parse(saved) : (seed as EventItem[]);
+  if (!saved) return seedEvents;
+  const parsed: EventItem[] = JSON.parse(saved);
+  const seed0101 = seedEvents.find((s) => s.id === '00000000-0000-0000-0000-000000000101');
+  const merged = parsed.map((ev) =>
+    ev.id === '00000000-0000-0000-0000-000000000101' && ev.status === 'open' && seed0101
+      ? { ...ev, entryEndAt: seed0101.entryEndAt }
+      : ev,
+  );
+  const existingIds = new Set(merged.map((e) => e.id));
+  for (const item of seedEvents) {
+    if (!existingIds.has(item.id)) merged.push(item);
+  }
+  return merged;
 }
 
 function saveEvents(events: EventItem[]) {
@@ -101,6 +119,152 @@ function saveSeals(seals: Record<string, SealInfo>) {
   localStorage.setItem(KEY_SEALS, JSON.stringify(seals));
 }
 
+function normalizeSeal(seal: SealInfo): SealInfo {
+  const h = seal.rosterHash || seal.hash || '';
+  const b = seal.ballotCount ?? seal.totalBallots ?? 0;
+  return {
+    ...seal,
+    hash: h,
+    rosterHash: h,
+    totalBallots: b,
+    ballotCount: b,
+  };
+}
+
+function getOrCreateSeal(events: EventItem[], id: string): SealInfo {
+  const seals = loadSeals();
+  if (seals[id]) return normalizeSeal(seals[id]);
+  const ev = events.find((e) => e.id === id);
+  if (ev && (ev.status === 'closed' || ev.status === 'drawn' || ev.status === 'paying' || ev.status === 'done')) {
+    const entries = loadEntries(id).filter((e) => e.status === 'active');
+    const totalBallots = entries.reduce((sum, e) => sum + e.ballotCount, 0) || 90;
+    const sealedAt = ev.entryEndAt;
+    const hash = generateSha256Hex(`${id}-${sealedAt}-${totalBallots}-${entries.length}`);
+    const defaultSeal: SealInfo = {
+      eventId: id,
+      hash,
+      rosterHash: hash,
+      sealedAt,
+      totalBallots,
+      ballotCount: totalBallots,
+      totalEntries: entries.length || 30,
+    };
+    seals[id] = defaultSeal;
+    saveSeals(seals);
+    return defaultSeal;
+  }
+  throw new ApiError('SEAL_NOT_FOUND', '명단 봉인 정보가 아직 등록되지 않았습니다.', 404);
+}
+
+function loadPayments(): Record<string, EventPaymentSummary> {
+  const saved = localStorage.getItem(KEY_PAYMENTS);
+  return saved ? JSON.parse(saved) : {};
+}
+
+function savePayments(payments: Record<string, EventPaymentSummary>) {
+  localStorage.setItem(KEY_PAYMENTS, JSON.stringify(payments));
+}
+
+function getEffectiveSections(ev: EventItem): Section[] {
+  return ev.sections && ev.sections.length > 0
+    ? ev.sections
+    : [
+        { id: 'sec-1', name: 'VIP 스탠딩', capacity: 50, price: ev.price },
+        { id: 'sec-2', name: 'R석 지정석', capacity: 100, price: ev.price },
+        { id: 'sec-3', name: 'S석 일반석', capacity: 150, price: ev.price },
+      ];
+}
+
+function buildDefaultPaymentSummary(ev: EventItem): EventPaymentSummary {
+  const sections = getEffectiveSections(ev);
+  const winnerNames = [
+    '김민준', '이서연', '박도윤', '정하은', '최지우', '강서준',
+    '조유진', '윤건우', '장수아', '임시우', '한지아', '오태양',
+    '서채원', '신예준', '권나은', '황도현', '안소율', '송준서',
+    '전다은', '홍승우', '유하린', '고우진', '문지민', '손지안',
+  ];
+  const backupNames = ['백소은', '허준혁', '남지윤'];
+  const methods = ['카카오페이', '토스페이', '신용·체크카드'];
+
+  const bookings: PaymentBookingItem[] = winnerNames.map((name, idx) => {
+    const sec = sections[idx % sections.length];
+    const amount = sec.price ?? ev.price;
+    let status: BookingPaymentStatus = 'paid';
+    if (idx >= 15 && idx < 21) status = 'pending';
+    else if (idx >= 21) status = 'expired_succeeded';
+
+    return {
+      id: `BK-2026-${String(idx + 1).padStart(4, '0')}`,
+      userName: name,
+      userPhone: `010-****-${String(2100 + idx * 43).slice(-4)}`,
+      sectionName: sec.name,
+      isTeam: idx % 4 === 0,
+      amount,
+      paymentMethod: status === 'paid' ? methods[idx % methods.length] : null,
+      status,
+      paidAt: status === 'paid' ? new Date(Date.now() - (20 - idx) * 1800_000).toISOString() : null,
+      deadlineAt: ev.paymentDeadlineAt,
+      succeededTo:
+        status === 'expired_succeeded'
+          ? `예비 ${(idx - 20)}번(${backupNames[(idx - 21) % backupNames.length]}) 승계`
+          : null,
+    };
+  });
+
+  const sectionPayments: SectionPaymentStat[] = sections.map((sec) => {
+    const secBookings = bookings.filter((b) => b.sectionName === sec.name);
+    const paid = secBookings.filter((b) => b.status === 'paid');
+    const pending = secBookings.filter((b) => b.status === 'pending');
+    const succeeded = secBookings.filter((b) => b.status === 'expired_succeeded');
+    return {
+      sectionId: sec.id,
+      sectionName: sec.name,
+      capacity: sec.capacity,
+      wonCount: secBookings.length,
+      paidCount: paid.length,
+      pendingCount: pending.length,
+      succeededCount: succeeded.length,
+      paidAmount: paid.reduce((sum, b) => sum + b.amount, 0),
+    };
+  });
+
+  return {
+    eventId: ev.id,
+    totalCapacity: sections.reduce((sum, s) => sum + s.capacity, 0),
+    totalWon: bookings.length,
+    totalPaid: bookings.filter((b) => b.status === 'paid').length,
+    totalPending: bookings.filter((b) => b.status === 'pending').length,
+    totalSucceeded: bookings.filter((b) => b.status === 'expired_succeeded').length,
+    totalRevenue: sectionPayments.reduce((sum, s) => sum + s.paidAmount, 0),
+    sectionPayments,
+    bookings,
+  };
+}
+
+function buildEmptyPaymentSummary(ev: EventItem): EventPaymentSummary {
+  const sections = getEffectiveSections(ev);
+  return {
+    eventId: ev.id,
+    totalCapacity: sections.reduce((sum, s) => sum + s.capacity, 0),
+    totalWon: 0,
+    totalPaid: 0,
+    totalPending: 0,
+    totalSucceeded: 0,
+    totalRevenue: 0,
+    sectionPayments: sections.map((sec) => ({
+      sectionId: sec.id,
+      sectionName: sec.name,
+      capacity: sec.capacity,
+      wonCount: 0,
+      paidCount: 0,
+      pendingCount: 0,
+      succeededCount: 0,
+      paidAmount: 0,
+    })),
+    bookings: [],
+  };
+}
+
 function findEvent(events: EventItem[], id: string): EventItem {
   const ev = events.find((e) => e.id === id);
   if (!ev) throw new ApiError('NOT_FOUND', '해당 공연 정보를 찾을 수 없습니다.', 404);
@@ -131,14 +295,11 @@ export async function mockFetch<T>(path: string, method: string, body?: string):
   const parts = cleanPath.split('/').filter(Boolean); // ['api', ...]
 
   // ==========================================
-  // 1. 관객용 공개 공연 목록: GET /api/public/events
+  // 1. 관객용 공개 공연 목록 & 봉인: GET /api/public/events
   // ==========================================
   if (parts[0] === 'api' && parts[1] === 'public' && parts[2] === 'events') {
     if (parts[4] === 'seal' && method === 'GET') {
-      const seals = loadSeals();
-      const seal = seals[parts[3]];
-      if (!seal) throw new ApiError('SEAL_NOT_FOUND', '명단 봉인 정보가 아직 등록되지 않았습니다.', 404);
-      return seal as T;
+      return getOrCreateSeal(events, parts[3]) as T;
     }
     if (method === 'GET') {
       return events.filter((e) => e.status === 'open' && !e.deletedAt) as T;
@@ -458,8 +619,10 @@ export async function mockFetch<T>(path: string, method: string, body?: string):
     const sealInfo: SealInfo = {
       eventId: id,
       hash,
+      rosterHash: hash,
       sealedAt,
       totalBallots,
+      ballotCount: totalBallots,
       totalEntries: entries.length,
     };
 
@@ -475,10 +638,42 @@ export async function mockFetch<T>(path: string, method: string, body?: string):
 
   // 3-10. 명단 봉인 정보 조회: GET /api/events/{id}/seal
   if (sub === 'seal' && method === 'GET') {
-    const seals = loadSeals();
-    const seal = seals[id];
-    if (!seal) throw new ApiError('SEAL_NOT_FOUND', '명단 봉인 정보가 아직 등록되지 않았습니다.', 404);
-    return seal as T;
+    return getOrCreateSeal(events, id) as T;
+  }
+
+  // ==========================================
+  // 7. 추첨 실행 및 결제 개시: POST /api/events/{id}/draw
+  // ==========================================
+  if (sub === 'draw' && method === 'POST') {
+    if (ev.status !== 'closed' && ev.status !== 'drawn') {
+      throw new ApiError('EVENT_NOT_CLOSED', '응모 마감 및 명단 봉인이 완료된 공연만 추첨을 실행할 수 있습니다.', 400);
+    }
+
+    ev.status = 'paying';
+    saveEvents(events);
+
+    const payments = loadPayments();
+    if (!payments[id]) {
+      payments[id] = buildDefaultPaymentSummary(ev);
+      savePayments(payments);
+    }
+    return payments[id] as T;
+  }
+
+  // ==========================================
+  // 8. 주최자 당첨 및 결제 현황 조회: GET /api/events/{id}/payments
+  // ==========================================
+  if (sub === 'payments' && method === 'GET') {
+    if (ev.status === 'draft' || ev.status === 'open' || ev.status === 'closed') {
+      return buildEmptyPaymentSummary(ev) as T;
+    }
+
+    const payments = loadPayments();
+    if (!payments[id]) {
+      payments[id] = buildDefaultPaymentSummary(ev);
+      savePayments(payments);
+    }
+    return payments[id] as T;
   }
 
   throw new ApiError('NOT_IMPLEMENTED', `지원하지 않는 요청입니다: ${method} ${path}`, 501);
