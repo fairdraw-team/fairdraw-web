@@ -8,7 +8,6 @@ import type { Team, EventItem, SealInfo } from '@/types/api';
 import { SealBox } from '@/components/SealBox';
 import { formatKst } from '@/lib/datetime';
 
-// 1. 실제 use(params) 및 상태/화면을 담당하는 내부 컴포넌트
 function TeamDetailContent({
   params,
 }: {
@@ -35,14 +34,20 @@ function TeamDetailContent({
         if (ignore) return;
         setTeam(teamData);
 
-        // 연관 공연 정보 및 봉인 정보 로드
         if (teamData.eventId) {
-          const eventData = await apiFetch<EventItem>(`/api/events/${teamData.eventId}`);
-          if (!ignore) {
+          const eventData = await apiFetch<EventItem>(
+            `/api/public/events/${teamData.eventId}`,
+            { auth: false },
+          ).catch(() => apiFetch<EventItem>(`/api/events/${teamData.eventId}`, { auth: false }));
+
+          if (!ignore && eventData) {
             setEvent(eventData);
-            if (eventData.status === 'closed') {
+            if (eventData.status !== 'draft' && eventData.status !== 'open') {
               try {
-                const sealData = await apiFetch<SealInfo>(`/api/events/${teamData.eventId}/seal`);
+                const sealData = await apiFetch<SealInfo>(
+                  `/api/public/events/${teamData.eventId}/seal`,
+                  { auth: false },
+                );
                 if (!ignore) setSeal(sealData);
               } catch {
                 // 봉인 정보가 아직 없으면 무시
@@ -52,7 +57,9 @@ function TeamDetailContent({
         }
       } catch (err) {
         if (!ignore) {
-          setErrorMsg(err instanceof Error ? err.message : '팀 정보를 불러오지 못했습니다.');
+          setErrorMsg(
+            err instanceof Error ? err.message : '팀 정보를 불러오지 못했습니다.',
+          );
         }
       } finally {
         if (!ignore) setLoading(false);
@@ -80,11 +87,12 @@ function TeamDetailContent({
     if (!team?.inviteCode) return;
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const shareUrl = `${origin}/teams/join?code=${team.inviteCode}`;
+    const displayTitle = team.eventTitle || event?.title || '공연';
 
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `[Fair Draw] ${team.eventTitle || '공연'} 연석 팀 초대`,
+          title: `[Fair Draw] ${displayTitle} 연석 팀 초대`,
           text: `함께 관람할 연석 팀에 초대합니다! 초대 코드: ${team.inviteCode}`,
           url: shareUrl,
         });
@@ -105,10 +113,8 @@ function TeamDetailContent({
 
   const handleLeaveTeam = async () => {
     if (!team) return;
-    const isLeader = true; // 현재 접속자(모의)
-    const confirmMessage = isLeader
-      ? '팀장님이 탈퇴하시면 팀이 즉시 해체되며, 함께 합류한 팀원 전원의 응모가 취소됩니다. 정말로 탈퇴하시겠습니까?'
-      : '연석 팀에서 탈퇴하시겠습니까? 탈퇴 시 본인의 해당 공연 응모 내역도 함께 취소됩니다.';
+    const confirmMessage =
+      '연석 팀에서 탈퇴하시겠습니까? 팀장이 탈퇴하면 팀이 해체되고 팀원 전원의 응모가 취소됩니다.';
 
     if (!confirm(confirmMessage)) return;
 
@@ -117,7 +123,7 @@ function TeamDetailContent({
       await apiFetch(`/api/teams/${team.id}/members/me`, {
         method: 'DELETE',
       });
-      alert('성공적으로 팀 탈퇴 및 해체 처리가 완료되었습니다.');
+      alert('성공적으로 팀 탈퇴 처리가 완료되었습니다.');
       router.push('/events');
     } catch (err) {
       alert(err instanceof Error ? err.message : '팀 탈퇴 처리에 실패했습니다.');
@@ -159,8 +165,11 @@ function TeamDetailContent({
     );
   }
 
-  const isFull = team.members.length >= team.maxMembers;
-  const isClosed = event?.status === 'closed';
+  const maxCount = team.maxSize ?? team.maxMembers ?? 2;
+  const isFull = team.full ?? team.members.length >= maxCount;
+  const isClosed = event ? event.status !== 'open' : false;
+  const rawEv = event as unknown as { startsAt?: string; eventAt?: string } | null;
+  const eventDate = rawEv?.startsAt ?? rawEv?.eventAt ?? '';
 
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100 py-10 px-4 sm:px-6 lg:px-8">
@@ -176,11 +185,11 @@ function TeamDetailContent({
           <div className="flex items-center gap-2">
             {isFull ? (
               <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-xs font-bold text-emerald-400">
-                팀 완성 ({team.members.length}/{team.maxMembers}명)
+                팀 완성 ({team.members.length}/{maxCount}명)
               </span>
             ) : (
               <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-xs font-bold text-amber-400">
-                팀원 모집 중 ({team.members.length}/{team.maxMembers}명)
+                팀원 모집 중 ({team.members.length}/{maxCount}명)
               </span>
             )}
           </div>
@@ -196,9 +205,9 @@ function TeamDetailContent({
             <span className="rounded-md bg-neutral-800 px-2.5 py-1 text-neutral-300 font-medium">
               선택 구역: {team.sectionName}
             </span>
-            {event && (
+            {eventDate && (
               <span className="rounded-md bg-neutral-800 px-2.5 py-1 text-neutral-400">
-                일시: {formatKst(event.eventAt)}
+                일시: {formatKst(eventDate)}
               </span>
             )}
           </div>
@@ -236,15 +245,13 @@ function TeamDetailContent({
         )}
 
         {/* 마감 후 명단 봉인 박스 표시 */}
-        {isClosed && seal && (
-          <SealBox seal={seal} />
-        )}
+        {isClosed && seal && <SealBox seal={seal} />}
 
         {/* 현재 팀원 목록 */}
         <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-6 shadow-xl">
           <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
             <h2 className="text-sm font-bold text-neutral-200">
-              참여 팀원 ({team.members.length} / {team.maxMembers}명)
+              참여 팀원 ({team.members.length} / {maxCount}명)
             </h2>
             <span className="text-xs text-neutral-400">
               1인당 {event?.ballotsPerUser || 3}장의 제비가 투입됨
@@ -252,34 +259,46 @@ function TeamDetailContent({
           </div>
 
           <div className="mt-4 space-y-3">
-            {team.members.map((member) => (
-              <div
-                key={member.id}
-                className="flex items-center justify-between rounded-xl bg-neutral-950 p-4 border border-neutral-800/80"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-800 font-bold text-neutral-300 text-xs">
-                    {member.userName.slice(0, 1)}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-neutral-200">{member.userName}</span>
-                      {member.isLeader && (
-                        <span className="rounded bg-indigo-500/20 px-1.5 py-0.5 text-[10px] font-bold text-indigo-400 border border-indigo-500/30">
-                          팀장
+            {team.members.map((member, idx) => {
+              const memberKey = member.profileId || member.id || String(idx);
+              const displayName = member.realName || member.userName || '팀원';
+              const isLeader = member.leader ?? member.isLeader ?? false;
+
+              return (
+                <div
+                  key={memberKey}
+                  className="flex items-center justify-between rounded-xl bg-neutral-950 p-4 border border-neutral-800/80"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-800 font-bold text-neutral-300 text-xs">
+                      {displayName.slice(0, 1)}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-neutral-200">
+                          {displayName}
                         </span>
+                        {isLeader && (
+                          <span className="rounded bg-indigo-500/20 px-1.5 py-0.5 text-[10px] font-bold text-indigo-400 border border-indigo-500/30">
+                            팀장
+                          </span>
+                        )}
+                      </div>
+                      {member.userPhone && (
+                        <div className="text-xs text-neutral-400 mt-0.5">
+                          {member.userPhone}
+                        </div>
                       )}
                     </div>
-                    {member.userPhone && (
-                      <div className="text-xs text-neutral-400 mt-0.5">{member.userPhone}</div>
-                    )}
                   </div>
+                  {member.joinedAt && (
+                    <div className="text-right text-xs text-neutral-400">
+                      {formatKst(member.joinedAt)} 합류
+                    </div>
+                  )}
                 </div>
-                <div className="text-right text-xs text-neutral-400">
-                  {formatKst(member.joinedAt)} 합류
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -304,7 +323,6 @@ function TeamDetailContent({
   );
 }
 
-// 2. Next.js 16 빌드 환경에서 URL 데이터 사전 렌더링 충돌을 방지하는 최상위 Suspense 래핑
 export default function TeamDetailPage({
   params,
 }: {

@@ -57,6 +57,12 @@ export interface TeamMember {
   profileId: string;
   realName: string;
   leader: boolean;
+  // 기존 mock 및 화면 호환용 선택 필드
+  id?: string;
+  userName?: string;
+  userPhone?: string;
+  isLeader?: boolean;
+  joinedAt?: string;
 }
 
 export interface Team {
@@ -69,6 +75,10 @@ export interface Team {
   maxSize: number;
   full: boolean;
   members: TeamMember[];
+  // 기존 mock 및 화면 호환용 선택 필드
+  eventTitle?: string;
+  maxMembers?: number;
+  status?: 'forming' | 'complete' | 'dissolved' | string;
 }
 
 // 2주차: 주최자 실시간 통계 및 응모자 명단 모델

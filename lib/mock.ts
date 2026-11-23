@@ -70,7 +70,11 @@ function loadEntries(eventId?: string): EventEntry[] {
 
   // 초기 시드 v2 데이터 생성 (30건의 연습용 응모 명단)
   if (entries.length === 0 && eventId) {
-    const names = ['김민준', '이서연', '박도윤', '정하은', '최지우', '강서준', '조유진', '윤건우', '장수아', '임시우', '한지아', '오태양', '서채원', '신예준', '권나은', '황도현', '안소율', '송준서', '전다은', '홍승우', '유하린', '고우진', '문지민', '손지안', '배현우', '백소은', '허준혁', '남지윤', '심태윤', '노하윤'];
+    const names = [
+      '김민준', '이서연', '박도윤', '정하은', '최지우', '강서준', '조유진', '윤건우', '장수아', '임시우',
+      '한지아', '오태양', '서채원', '신예준', '권나은', '황도현', '안소율', '송준서', '전다은', '홍승우',
+      '유하린', '고우진', '문지민', '손지안', '배현우', '백소은', '허준혁', '남지윤', '심태윤', '노하윤',
+    ];
     entries = names.map((name, idx) => ({
       id: `entry-${idx + 1}`,
       userId: `user-${idx + 1}`,
@@ -108,9 +112,15 @@ function findEvent(events: EventItem[], id: string): EventItem {
 }
 
 function checkDates(ev: EventItem) {
-  const t = [ev.entryStartAt, ev.entryEndAt, ev.paymentDeadlineAt, ev.eventAt].map((d) =>
-    new Date(d).getTime(),
-  );
+  const raw = ev as unknown as Record<string, string>;
+  const openStr = raw.entryOpensAt ?? raw.entryStartAt;
+  const closeStr = raw.entryClosesAt ?? raw.entryEndAt;
+  const payStr = raw.paymentDueAt ?? raw.paymentDeadlineAt;
+  const startStr = raw.startsAt ?? raw.eventAt;
+
+  if (!openStr || !closeStr || !payStr || !startStr) return;
+
+  const t = [openStr, closeStr, payStr, startStr].map((d) => new Date(d).getTime());
   if (!(t[0] < t[1] && t[1] < t[2] && t[2] < t[3])) {
     throw new ApiError(
       'INVALID_DATES',
@@ -141,7 +151,7 @@ export async function mockFetch<T>(path: string, method: string, body?: string):
       return seal as T;
     }
     if (method === 'GET') {
-      return events.filter((e) => e.status === 'open' && !e.deletedAt) as T;
+      return events.filter((e) => e.status !== 'draft' && !e.deletedAt) as T;
     }
   }
 
@@ -159,21 +169,25 @@ export async function mockFetch<T>(path: string, method: string, body?: string):
 
       const teamId = crypto.randomUUID();
       const inviteCode = generateInviteCode();
+      const maxSize = targetEvent.maxTeamSize || 2;
       const newTeam: Team = {
         id: teamId,
         eventId,
         eventTitle: targetEvent.title,
         sectionId,
         sectionName: section?.name ?? '기본 구역',
-        maxMembers: targetEvent.maxTeamSize || 2,
         leaderId: 'user-leader-me',
         inviteCode,
+        maxSize,
+        maxMembers: maxSize,
+        full: false,
         status: 'forming',
-        createdAt: new Date().toISOString(),
         members: [
           {
+            profileId: 'user-leader-me',
+            realName: '나 (팀장)',
+            leader: true,
             id: crypto.randomUUID(),
-            userId: 'user-leader-me',
             userName: '나 (팀장)',
             userPhone: '010-1234-5678',
             isLeader: true,
@@ -212,13 +226,16 @@ export async function mockFetch<T>(path: string, method: string, body?: string):
       if (!team || team.status === 'dissolved') {
         throw new ApiError('INVALID_CODE', '초대 코드를 다시 확인해 주시기 바랍니다.', 404);
       }
-      if (team.members.length >= team.maxMembers) {
+      const limit = team.maxSize ?? team.maxMembers ?? 2;
+      if (team.members.length >= limit) {
         throw new ApiError('TEAM_FULL', '해당 팀은 정원이 마감되었습니다.', 400);
       }
 
       const newMember: TeamMember = {
+        profileId: 'user-member-me',
+        realName: '동행자 (나)',
+        leader: false,
         id: crypto.randomUUID(),
-        userId: 'user-member-me',
         userName: '동행자 (나)',
         userPhone: '010-9876-5432',
         isLeader: false,
@@ -226,8 +243,9 @@ export async function mockFetch<T>(path: string, method: string, body?: string):
       };
 
       team.members.push(newMember);
-      if (team.members.length >= team.maxMembers) {
-        team.status = 'completed';
+      if (team.members.length >= limit) {
+        team.full = true;
+        team.status = 'complete';
       }
       saveTeams(teams);
 
@@ -263,12 +281,10 @@ export async function mockFetch<T>(path: string, method: string, body?: string):
     // 2-4. 팀 탈퇴 또는 해체: DELETE /api/teams/{id}/members/me
     if (teamId && parts[3] === 'members' && parts[4] === 'me' && method === 'DELETE') {
       if (!team) throw new ApiError('NOT_FOUND', '해당 팀 정보를 찾을 수 없습니다.', 404);
-      // 팀장인 경우 전체 팀 해체 처리
       team.status = 'dissolved';
       team.members = [];
       saveTeams(teams);
 
-      // 응모 명단에서도 취소 처리
       const entries = loadEntries(team.eventId);
       entries.forEach((ent) => {
         if (ent.teamId === team.id) {
@@ -385,11 +401,14 @@ export async function mockFetch<T>(path: string, method: string, body?: string):
     const activeEntries = entries.filter((e) => e.status === 'active');
     const teams = loadTeams().filter((t) => t.eventId === id && t.status !== 'dissolved');
 
-    const sections = ev.sections && ev.sections.length > 0 ? ev.sections : [
-      { id: 'sec-1', name: 'VIP 스탠딩', capacity: 50, price: ev.price },
-      { id: 'sec-2', name: 'R석 지정석', capacity: 100, price: ev.price },
-      { id: 'sec-3', name: 'S석 일반석', capacity: 150, price: ev.price },
-    ];
+    const sections =
+      ev.sections && ev.sections.length > 0
+        ? ev.sections
+        : [
+            { id: 'sec-1', name: 'VIP 스탠딩', capacity: 50, price: ev.price },
+            { id: 'sec-2', name: 'R석 지정석', capacity: 100, price: ev.price },
+            { id: 'sec-3', name: 'S석 일반석', capacity: 150, price: ev.price },
+          ];
 
     const sectionStats = sections.map((sec) => {
       const secEntries = activeEntries.filter(
@@ -409,14 +428,18 @@ export async function mockFetch<T>(path: string, method: string, body?: string):
 
     const totalBallots = activeEntries.reduce((sum, e) => sum + e.ballotCount, 0);
 
-    const stats: EventStats = {
+    const stats = {
       eventId: id,
+      status: ev.status,
+      totalApplicants: activeEntries.length,
       totalEntries: activeEntries.length,
       totalBallots,
+      teamCount: teams.length,
       totalTeams: teams.length,
+      cancelledCount: entries.filter((e) => e.status === 'cancelled').length,
       cancelledEntries: entries.filter((e) => e.status === 'cancelled').length,
       sectionStats,
-    };
+    } as unknown as EventStats;
 
     return stats as T;
   }
@@ -431,13 +454,13 @@ export async function mockFetch<T>(path: string, method: string, body?: string):
     const start = page * size;
     const paginated = entries.slice(start, start + size);
 
-    const response: EntriesPageResponse = {
+    const response = {
       entries: paginated,
       total: entries.length,
       page,
       size,
       hasMore: start + size < entries.length,
-    };
+    } as unknown as EntriesPageResponse;
 
     return response as T;
   }
@@ -453,15 +476,18 @@ export async function mockFetch<T>(path: string, method: string, body?: string):
     const entries = loadEntries(id).filter((e) => e.status === 'active');
     const totalBallots = entries.reduce((sum, e) => sum + e.ballotCount, 0);
     const sealedAt = new Date().toISOString();
-    const hash = generateSha256Hex(`${id}-${sealedAt}-${totalBallots}-${entries.length}`);
+    const rosterHash = generateSha256Hex(`${id}-${sealedAt}-${totalBallots}-${entries.length}`);
 
-    const sealInfo: SealInfo = {
+    const sealInfo = {
       eventId: id,
-      hash,
+      rosterHash,
+      hash: rosterHash,
       sealedAt,
+      ballotCount: totalBallots,
       totalBallots,
       totalEntries: entries.length,
-    };
+      sections: [],
+    } as unknown as SealInfo;
 
     const seals = loadSeals();
     seals[id] = sealInfo;
