@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { supabase } from '../lib/supabase'; // <-- 파일 위치에 맞는 상대 경로 또는 '@/lib/supabase'
+import { supabase } from '@/lib/supabase'; // <-- 파일 위치에 맞는 상대 경로 또는 '@/lib/supabase'
 import { ShieldCheck, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 

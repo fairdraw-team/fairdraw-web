@@ -4,6 +4,9 @@ import { supabase } from './supabase';
 import drawMeMock from '../mocks/draw-me.json';
 import drawInfoMock from '../mocks/draw.json';
 import drawBallotsMock from '../mocks/draw-ballots.json';
+import bookingMeMock from '../mocks/booking-me.json';
+import paymentPrepareMock from '../mocks/payment-prepare.json';
+import ticketsMeMock from '../mocks/tickets-me.json';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? '';
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
@@ -42,6 +45,17 @@ export async function apiFetch<T>(
     }
     if (/\/api\/public\/events\/[^/]+\/draw$/.test(path)) {
       return drawInfoMock as unknown as T;
+    }
+
+    // 4주차 예매·결제·티켓 Mock 응답 분기
+    if (/\/api\/events\/[^/]+\/booking\/me$/.test(path)) {
+      return bookingMeMock as unknown as T;
+    }
+    if (path === '/api/payments/prepare') {
+      return paymentPrepareMock as unknown as T;
+    }
+    if (path === '/api/tickets/me') {
+      return ticketsMeMock as unknown as T;
     }
 
     return mockFetch<T>(

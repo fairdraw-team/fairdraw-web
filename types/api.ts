@@ -5,26 +5,18 @@ export type EventStatus = 'draft' | 'open' | 'closed' | 'drawn' | 'paying' | 'do
 
 export interface MyEntryAllocation {
   sectionId: string;
-  sectionName?: string;
+  sectionName: string;
   ballots: number;
 }
 
 export interface MyEntry {
   id: string;
   eventId: string;
-  status: 'active' | 'cancelled';
+  status: string;
+  teamId: string | null;
   createdAt: string;
+  totalBallots: number;
   allocations: MyEntryAllocation[];
-  team?: {
-    id: string;
-    name?: string;
-    sectionId?: string;
-    members?: {
-      id: string;
-      userName: string;
-      isLeader?: boolean;
-    }[];
-  } | null;
 }
 
 export interface Section {
@@ -62,26 +54,21 @@ export interface SectionInput {
 
 // 2주차: 연석 팀(Team) 모델
 export interface TeamMember {
-  id: string;
-  userId: string;
-  userName: string;
-  userPhone?: string;
-  isLeader: boolean;
-  joinedAt: string;
+  profileId: string;
+  realName: string;
+  leader: boolean;
 }
 
 export interface Team {
   id: string;
   eventId: string;
-  eventTitle?: string;
   sectionId: string;
-  sectionName?: string;
-  maxMembers: number;
+  sectionName: string;
   leaderId: string;
-  inviteCode?: string; // 팀장에게만 제공 (6글자)
+  inviteCode: string;
+  maxSize: number;
+  full: boolean;
   members: TeamMember[];
-  status: 'forming' | 'completed' | 'dissolved';
-  createdAt: string;
 }
 
 // 2주차: 주최자 실시간 통계 및 응모자 명단 모델
@@ -181,4 +168,42 @@ export interface PublicBallot {
 export interface PublicBallotsResponse {
   eventId: string;
   ballots: PublicBallot[];
+}
+// --- 4주차: 예매, 결제, 티켓 타입 ---
+
+export interface MyBooking {
+  bookingId: string;
+  eventId: string;
+  status: 'pending' | 'paid' | 'expired' | 'cancelled';
+  sectionName: string;
+  amount: number;
+  payDueAt: string;
+  source: 'draw' | 'succession';
+  paidAt: string | null;
+}
+
+export interface PaymentPrepare {
+  paymentId: string;
+  amount: number;
+  orderName: string;
+  storeId: string;
+  channelKey: string;
+}
+
+export interface PaymentComplete {
+  paymentId: string;
+  status: 'paid';
+  bookingId: string;
+  eventId: string;
+}
+
+export interface MyTicket {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  sectionName: string;
+  startsAt: string;
+  code: string; // 40글자 16진수 비밀값
+  status: 'valid' | 'used' | 'void';
+  usedAt: string | null;
 }

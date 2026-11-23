@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, ChevronDown, Check } from 'lucide-react';
 

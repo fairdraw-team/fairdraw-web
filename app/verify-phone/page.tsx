@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '../lib/supabase';
-import { apiFetch } from '../lib/api';
+import { supabase } from '@/lib/supabase';
+import { apiFetch } from '@/lib/api';
 import { Smartphone, ShieldCheck, CheckCircle2, User } from 'lucide-react';
 
 export default function VerifyPhonePage() {

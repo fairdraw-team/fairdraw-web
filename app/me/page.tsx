@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '../lib/supabase';
-import { apiFetch } from '../lib/api';
+import { supabase } from '@/lib/supabase';
+import { apiFetch } from '@/lib/api';
 import { User, Copy, Check, LogOut, ChevronLeft, Shield, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 

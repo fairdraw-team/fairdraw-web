@@ -7,7 +7,7 @@ import { apiFetch, ApiError } from '@/lib/api';
 import { formatKst } from '@/lib/datetime';
 import { isAtLeast } from '@/lib/eventStatus';
 import { SealBox } from '@/components/SealBox';
-import type { EventItem, MyEntry, SealInfo } from '@/types/api';
+import type { EventItem, MyEntry, SealInfo, Team } from '@/types/api';
 
 function MyEntryContent({
   params,
@@ -19,6 +19,7 @@ function MyEntryContent({
 
   const [event, setEvent] = useState<EventItem | null>(null);
   const [entry, setEntry] = useState<MyEntry | null>(null);
+  const [team, setTeam] = useState<Team | null>(null);
   const [seal, setSeal] = useState<SealInfo | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -50,9 +51,17 @@ function MyEntryContent({
         // 3. 내 응모 내역 조회 (GET /api/events/{id}/entries/me)
         try {
           const entryData = await apiFetch<MyEntry>(`/api/events/${id}/entries/me`);
-          if (!ignore) {
-            setEntry(entryData);
-            setNotFound(false);
+          if (ignore) return;
+          setEntry(entryData);
+          setNotFound(false);
+
+          // 4. 팀 응모인 경우 teamId로 팀 상세(팀원 이름 목록) 추가 조회
+          if (entryData.teamId) {
+            apiFetch<Team>(`/api/teams/${entryData.teamId}`)
+              .then((t) => {
+                if (!ignore) setTeam(t);
+              })
+              .catch(() => {});
           }
         } catch (err) {
           if (!ignore) {
@@ -113,6 +122,8 @@ function MyEntryContent({
 
   const isClosed = event ? event.status !== 'open' : false;
   const isDrawn = event ? isAtLeast(event.status, 'drawn') : false;
+  const isPaying = event ? isAtLeast(event.status, 'paying') : false;
+  const isDone = event?.status === 'done';
 
   return (
     <div className="min-h-screen bg-stone-50/50 text-stone-900 antialiased">
@@ -135,17 +146,28 @@ function MyEntryContent({
             <span className="text-[11px] font-bold text-indigo-600">응모 공연</span>
             <h1 className="mt-1 text-lg font-black text-stone-900">{event.title}</h1>
             <p className="mt-1 text-xs text-stone-500">
-              {event.venue} · {formatKst(event.eventAt)}
+              {event.venue} ·{' '}
+              {formatKst(
+                (event as unknown as { startsAt?: string; eventAt?: string }).startsAt ??
+                  (event as unknown as { eventAt?: string }).eventAt ??
+                  ''
+              )}
             </p>
           </div>
         )}
 
-        {/* 추첨 완료 안내 및 결과/검증 이동 배너 */}
+        {/* 추첨 완료 / 결제 중 / 종료 안내 및 결과·검증 이동 배너 */}
         {isDrawn && (
           <div className="rounded-2xl border border-indigo-200 bg-indigo-50/80 p-5 shadow-xs">
-            <p className="text-sm font-extrabold text-indigo-950">추첨 완료</p>
+            <p className="text-sm font-extrabold text-indigo-950">
+              {isDone ? '결제 종료' : isPaying ? '결제 진행 중' : '추첨 완료'}
+            </p>
             <p className="mt-1 text-xs text-indigo-700">
-              당첨·대기·낙첨 결과 확인과 공개 시드 검증을 진행하실 수 있습니다.
+              {isDone
+                ? '모든 결제 절차가 종료되었습니다. 결과 및 티켓을 확인하실 수 있습니다.'
+                : isPaying
+                  ? '당첨자 및 승계 대상자의 결제가 진행 중입니다. 내 결과에서 결제 상태를 확인하세요.'
+                  : '당첨·대기·낙첨 결과 확인과 공개 시드 검증을 진행하실 수 있습니다.'}
             </p>
             <div className="mt-4 flex flex-wrap gap-2.5">
               <Link
@@ -169,7 +191,10 @@ function MyEntryContent({
 
         {/* 에러 표시 */}
         {errorMsg && (
-          <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+          <div
+            role="alert"
+            className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"
+          >
             {errorMsg}
           </div>
         )}
@@ -202,29 +227,28 @@ function MyEntryContent({
                   응모 시각: {formatKst(entry.createdAt)}
                 </p>
               </div>
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-700 border border-emerald-200">
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-700">
                 {entry.status === 'active' ? '응모 완료' : '취소됨'}
               </span>
             </div>
 
-            {/* 연석 팀 정보 표시 (팀 응모인 경우) */}
-            {entry.team && (
+            {/* 연석 팀 정보 표시 (entry.teamId가 있는 경우) */}
+            {entry.teamId && (
               <div className="rounded-2xl border border-indigo-100 bg-indigo-50/70 p-4">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-extrabold text-indigo-700">
-                    연석 팀 응모 ({entry.team.members?.length ?? 1}명)
+                    연석 팀 응모 {team ? `(${team.members.length}/${team.maxSize}명)` : ''}
                   </span>
                   <Link
-                    href={`/teams/${entry.team.id}`}
+                    href={`/teams/${entry.teamId}`}
                     className="text-xs font-bold text-indigo-600 underline"
                   >
                     팀 상세 화면 이동 &rarr;
                   </Link>
                 </div>
-                {entry.team.members && (
+                {team?.members && team.members.length > 0 && (
                   <p className="mt-1.5 text-xs text-stone-600">
-                    함께 응모한 팀원:{' '}
-                    {entry.team.members.map((m) => m.userName).join(', ')}
+                    함께 응모한 팀원: {team.members.map((m) => m.realName).join(', ')}
                   </p>
                 )}
               </div>
@@ -244,7 +268,7 @@ function MyEntryContent({
                     <td className="py-3 font-bold text-stone-900">
                       {alloc.sectionName || alloc.sectionId}
                     </td>
-                    <td className="py-3 text-right font-black text-indigo-600 tabular-nums">
+                    <td className="py-3 text-right font-black tabular-nums text-indigo-600">
                       {alloc.ballots}장
                     </td>
                   </tr>
@@ -255,11 +279,11 @@ function MyEntryContent({
             {/* 하단 취소 / 팀 탈퇴 안내 */}
             {!isClosed && entry.status === 'active' && (
               <div className="border-t border-stone-100 pt-4">
-                {entry.team ? (
+                {entry.teamId ? (
                   <div className="rounded-xl bg-stone-100 p-3.5 text-center text-xs text-stone-600">
                     연석 팀으로 응모된 내역입니다. 취소하려면{' '}
                     <Link
-                      href={`/teams/${entry.team.id}`}
+                      href={`/teams/${entry.teamId}`}
                       className="font-bold text-indigo-600 underline"
                     >
                       팀 화면에서 탈퇴

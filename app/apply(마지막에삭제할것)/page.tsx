@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { apiFetch } from '../lib/api';
+import { apiFetch } from '@/lib/api';
 import {
   Maximize2,
   ZoomIn,
