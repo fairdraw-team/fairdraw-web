@@ -4,8 +4,11 @@ import { supabase } from './supabase';
 import drawMeMock from '../mocks/draw-me.json';
 import drawInfoMock from '../mocks/draw.json';
 import drawBallotsMock from '../mocks/draw-ballots.json';
+import drawResultsMock from '../mocks/draw-results.json';
 import bookingMeMock from '../mocks/booking-me.json';
 import paymentPrepareMock from '../mocks/payment-prepare.json';
+import paymentStatsMock from '../mocks/payment-stats.json';
+import bookingsMock from '../mocks/bookings.json';
 import ticketsMeMock from '../mocks/tickets-me.json';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? '';
@@ -36,31 +39,64 @@ export async function apiFetch<T>(
 ): Promise<T> {
   // USE_MOCK 분기 — 백엔드 없이 화면 작업할 때
   if (USE_MOCK) {
+    const method = (init.method ?? 'GET').toUpperCase();
+    const [cleanPath, queryStr] = path.split('?');
+    const query = new URLSearchParams(queryStr ?? '');
+
     // 3주차 추첨·검증 Mock 응답 분기
-    if (/\/api\/events\/[^/]+\/draw\/me$/.test(path)) {
+    if (/\/api\/events\/[^/]+\/draw\/me$/.test(cleanPath)) {
       return drawMeMock as unknown as T;
     }
-    if (/\/api\/public\/events\/[^/]+\/draw\/ballots$/.test(path)) {
+    if (/\/api\/public\/events\/[^/]+\/draw\/ballots$/.test(cleanPath)) {
       return drawBallotsMock as unknown as T;
     }
-    if (/\/api\/public\/events\/[^/]+\/draw$/.test(path)) {
+    if (/\/api\/public\/events\/[^/]+\/draw$/.test(cleanPath)) {
       return drawInfoMock as unknown as T;
+    }
+    if (/\/api\/events\/[^/]+\/draw\/results$/.test(cleanPath) && method === 'GET') {
+      const resultFilter = query.get('result');
+      const filtered = resultFilter
+        ? drawResultsMock.content.filter((r) => r.result === resultFilter)
+        : drawResultsMock.content;
+      return {
+        ...drawResultsMock,
+        content: filtered,
+        totalElements: filtered.length,
+        totalPages: 1,
+      } as unknown as T;
     }
 
     // 4주차 예매·결제·티켓 Mock 응답 분기
-    if (/\/api\/events\/[^/]+\/booking\/me$/.test(path)) {
+    if (/\/api\/events\/[^/]+\/booking\/me$/.test(cleanPath)) {
       return bookingMeMock as unknown as T;
     }
-    if (path === '/api/payments/prepare') {
+    if (cleanPath === '/api/payments/prepare') {
       return paymentPrepareMock as unknown as T;
     }
-    if (path === '/api/tickets/me') {
+    if (cleanPath === '/api/tickets/me') {
       return ticketsMeMock as unknown as T;
+    }
+    if (/\/api\/events\/[^/]+\/bookings$/.test(cleanPath) && method === 'GET') {
+      const statusFilter = query.get('status');
+      const filtered = statusFilter
+        ? bookingsMock.content.filter((b) => b.status === statusFilter)
+        : bookingsMock.content;
+      return {
+        ...bookingsMock,
+        content: filtered,
+        totalElements: filtered.length,
+        totalPages: 1,
+      } as unknown as T;
+    }
+    if (/\/api\/events\/[^/]+\/payment\/stats$/.test(cleanPath) && method === 'GET') {
+      return mockFetch<T>(path, method, typeof init.body === 'string' ? init.body : undefined).catch(
+        () => paymentStatsMock as unknown as T,
+      );
     }
 
     return mockFetch<T>(
       path,
-      init.method ?? 'GET',
+      method,
       typeof init.body === 'string' ? init.body : undefined,
     );
   }

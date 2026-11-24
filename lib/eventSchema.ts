@@ -19,21 +19,21 @@ const eventFields = z.object({
   title: z.string().trim().min(1, '공연 제목을 입력해 주세요.'),
   venue: z.string().trim().min(1, '공연 장소를 입력해 주세요.'),
   posterUrl: z.string().optional(),
-  eventAt: dateField('공연 일시'),
-  entryStartAt: dateField('응모 시작 일시'),
-  entryEndAt: dateField('응모 마감 일시'),
-  paymentDeadlineAt: dateField('결제 마감 일시'),
+  startsAt: dateField('공연 일시'),
+  entryOpensAt: dateField('응모 시작 일시'),
+  entryClosesAt: dateField('응모 마감 일시'),
+  paymentDueAt: dateField('결제 마감 일시'),
   price: num('기본 티켓 가격', 0),
   ballotsPerUser: num('1인당 제비 수', 1),
   maxTeamSize: num('최대 연석 인원', 1),
 });
 
-type DateKey = 'entryStartAt' | 'entryEndAt' | 'paymentDeadlineAt' | 'eventAt';
+type DateKey = 'entryOpensAt' | 'entryClosesAt' | 'paymentDueAt' | 'startsAt';
 const ORDER: [DateKey, string][] = [
-  ['entryStartAt', '응모 시작'],
-  ['entryEndAt', '응모 마감'],
-  ['paymentDeadlineAt', '당첨자 결제 마감'],
-  ['eventAt', '실제 공연'],
+  ['entryOpensAt', '응모 시작'],
+  ['entryClosesAt', '응모 마감'],
+  ['paymentDueAt', '당첨자 결제 마감'],
+  ['startsAt', '실제 공연'],
 ];
 
 function checkDateOrder(v: Record<DateKey, string>, ctx: z.RefinementCtx) {

@@ -4,9 +4,10 @@ import { Suspense, use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
-import type { Team, EventItem, SealInfo } from '@/types/api';
-import { SealBox } from '@/components/SealBox';
 import { formatKst } from '@/lib/datetime';
+import { isAtLeast } from '@/lib/eventStatus';
+import { SealBox } from '@/components/SealBox';
+import type { EventItem, MyBooking, MyDrawResult, SealInfo, Team } from '@/types/api';
 
 function TeamDetailContent({
   params,
@@ -19,6 +20,8 @@ function TeamDetailContent({
   const [team, setTeam] = useState<Team | null>(null);
   const [event, setEvent] = useState<EventItem | null>(null);
   const [seal, setSeal] = useState<SealInfo | null>(null);
+  const [drawMe, setDrawMe] = useState<MyDrawResult | null>(null);
+  const [bookingMe, setBookingMe] = useState<MyBooking | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
@@ -42,16 +45,33 @@ function TeamDetailContent({
 
           if (!ignore && eventData) {
             setEvent(eventData);
-            if (eventData.status !== 'draft' && eventData.status !== 'open') {
-              try {
-                const sealData = await apiFetch<SealInfo>(
-                  `/api/public/events/${teamData.eventId}/seal`,
-                  { auth: false },
-                );
-                if (!ignore) setSeal(sealData);
-              } catch {
-                // 봉인 정보가 아직 없으면 무시
-              }
+            if (isAtLeast(eventData.status, 'closed')) {
+              apiFetch<SealInfo>(
+                `/api/public/events/${teamData.eventId}/seal`,
+                { auth: false },
+              )
+                .then((sealData) => {
+                  if (!ignore) setSeal(sealData);
+                })
+                .catch(() => {});
+            }
+
+            // FB-5: 공연이 drawn 이상이면 draw/me로 팀의 결과 한 줄을 불러옴
+            if (isAtLeast(eventData.status, 'drawn')) {
+              apiFetch<MyDrawResult>(`/api/events/${teamData.eventId}/draw/me`)
+                .then((d) => {
+                  if (!ignore) setDrawMe(d);
+                })
+                .catch(() => {});
+            }
+
+            // FB-5: 공연이 paying 이상이면 booking/me로 내 예매 상태 한 줄을 불러옴
+            if (isAtLeast(eventData.status, 'paying')) {
+              apiFetch<MyBooking>(`/api/events/${teamData.eventId}/booking/me`)
+                .then((b) => {
+                  if (!ignore) setBookingMe(b);
+                })
+                .catch(() => {});
             }
           }
         }
@@ -87,7 +107,7 @@ function TeamDetailContent({
     if (!team?.inviteCode) return;
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const shareUrl = `${origin}/teams/join?code=${team.inviteCode}`;
-    const displayTitle = team.eventTitle || event?.title || '공연';
+    const displayTitle = event?.title || '공연';
 
     if (navigator.share) {
       try {
@@ -113,8 +133,10 @@ function TeamDetailContent({
 
   const handleLeaveTeam = async () => {
     if (!team) return;
-    const confirmMessage =
-      '연석 팀에서 탈퇴하시겠습니까? 팀장이 탈퇴하면 팀이 해체되고 팀원 전원의 응모가 취소됩니다.';
+    const isLeader = Boolean(team.inviteCode);
+    const confirmMessage = isLeader
+      ? '팀장님이 탈퇴하시면 팀이 즉시 해체되며, 함께 합류한 팀원 전원의 응모가 취소됩니다. 정말로 탈퇴하시겠습니까?'
+      : '연석 팀에서 탈퇴하시겠습니까? 탈퇴 시 본인의 해당 공연 응모 내역도 함께 취소됩니다.';
 
     if (!confirm(confirmMessage)) return;
 
@@ -142,17 +164,13 @@ function TeamDetailContent({
     );
   }
 
-  if (!team || team.status === 'dissolved') {
+  if (!team) {
     return (
       <main className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center p-4">
         <div className="text-center max-w-md">
-          <h2 className="text-lg font-bold text-neutral-200">
-            {team?.status === 'dissolved' ? '해체된 팀입니다' : '팀 정보를 찾을 수 없습니다'}
-          </h2>
+          <h2 className="text-lg font-bold text-neutral-200">팀 정보를 찾을 수 없습니다</h2>
           <p className="mt-2 text-xs text-neutral-400 leading-relaxed">
-            {team?.status === 'dissolved'
-              ? '팀장 또는 운영자에 의해 팀이 해체되었거나 응모가 취소되었습니다.'
-              : errorMsg || '요청하신 연석 팀 정보가 존재하지 않습니다.'}
+            {errorMsg || '요청하신 연석 팀 정보가 존재하지 않거나 해체되었습니다.'}
           </p>
           <Link
             href="/events"
@@ -165,11 +183,27 @@ function TeamDetailContent({
     );
   }
 
-  const maxCount = team.maxSize ?? team.maxMembers ?? 2;
-  const isFull = team.full ?? team.members.length >= maxCount;
-  const isClosed = event ? event.status !== 'open' : false;
-  const rawEv = event as unknown as { startsAt?: string; eventAt?: string } | null;
-  const eventDate = rawEv?.startsAt ?? rawEv?.eventAt ?? '';
+  const isClosed = event ? event.status !== 'open' && event.status !== 'draft' : false;
+  const isDrawn = event ? isAtLeast(event.status, 'drawn') : false;
+  const isPaying = event ? isAtLeast(event.status, 'paying') : false;
+
+  const drawResultText =
+    drawMe?.result === 'won'
+      ? `당첨되었습니다 · ${drawMe.sectionName ?? team.sectionName}구역`
+      : drawMe?.result === 'waitlisted'
+        ? `${drawMe.sectionName ?? team.sectionName}구역 대기 ${drawMe.waitlistRank ?? 1}번`
+        : drawMe?.result === 'lost'
+          ? '아쉽지만 이번에는 당첨되지 않았습니다'
+          : null;
+
+  const bookingStatusText =
+    bookingMe?.status === 'pending'
+      ? `결제 대기 · ${formatKst(bookingMe.payDueAt)}까지`
+      : bookingMe?.status === 'paid'
+        ? '예매 확정'
+        : bookingMe?.status === 'expired'
+          ? '결제 기한 만료'
+          : null;
 
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100 py-10 px-4 sm:px-6 lg:px-8">
@@ -183,13 +217,13 @@ function TeamDetailContent({
             &larr; 공연 목록으로 돌아가기
           </Link>
           <div className="flex items-center gap-2">
-            {isFull ? (
+            {team.full ? (
               <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-xs font-bold text-emerald-400">
-                팀 완성 ({team.members.length}/{maxCount}명)
+                팀 완성 ({team.members.length}/{team.maxSize}명)
               </span>
             ) : (
               <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-xs font-bold text-amber-400">
-                팀원 모집 중 ({team.members.length}/{maxCount}명)
+                팀원 모집 중 ({team.members.length}/{team.maxSize}명)
               </span>
             )}
           </div>
@@ -199,19 +233,53 @@ function TeamDetailContent({
         <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-6 shadow-xl">
           <div className="text-xs font-medium text-neutral-400">연석 응모 지정 공연</div>
           <h1 className="mt-1 text-xl font-bold text-white tracking-tight">
-            {team.eventTitle || event?.title || '공연명'}
+            {event?.title || '공연명'}
           </h1>
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
             <span className="rounded-md bg-neutral-800 px-2.5 py-1 text-neutral-300 font-medium">
               선택 구역: {team.sectionName}
             </span>
-            {eventDate && (
+            {event?.startsAt && (
               <span className="rounded-md bg-neutral-800 px-2.5 py-1 text-neutral-400">
-                일시: {formatKst(eventDate)}
+                일시: {formatKst(event.startsAt)}
               </span>
             )}
           </div>
         </div>
+
+        {/* FB-5: 공연이 drawn 이상이면 팀 추첨 결과 한 줄 & paying 이상이면 내 예매 상태 한 줄 + 안내 + 내 결과 보기 링크 */}
+        {isDrawn && (
+          <div className="rounded-2xl border border-indigo-500/30 bg-indigo-950/30 p-5 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">
+                팀 추첨 및 예매 상태
+              </span>
+              <Link
+                href={`/events/${team.eventId}/result`}
+                className="rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-bold text-white transition hover:bg-indigo-500"
+              >
+                내 결과 보기 &rarr;
+              </Link>
+            </div>
+
+            {drawResultText && (
+              <p className="text-sm font-bold text-white">{drawResultText}</p>
+            )}
+
+            {isPaying && (
+              <div className="space-y-1.5 border-t border-indigo-500/20 pt-3 text-xs">
+                {bookingStatusText && (
+                  <p className="font-bold text-emerald-400">
+                    내 예매 상태: {bookingStatusText}
+                  </p>
+                )}
+                <p className="text-neutral-300 font-medium">
+                  팀원은 각자 결제합니다. 팀원이 결제하지 않으면 옆자리가 다른 사람에게 넘어갑니다.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 팀장 전용 초대 코드 박스 */}
         {team.inviteCode && !isClosed && (
@@ -247,11 +315,11 @@ function TeamDetailContent({
         {/* 마감 후 명단 봉인 박스 표시 */}
         {isClosed && seal && <SealBox seal={seal} />}
 
-        {/* 현재 팀원 목록 */}
+        {/* 현재 팀원 목록 (P-4: profileId, realName, leader만 사용) */}
         <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-6 shadow-xl">
           <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
             <h2 className="text-sm font-bold text-neutral-200">
-              참여 팀원 ({team.members.length} / {maxCount}명)
+              참여 팀원 ({team.members.length} / {team.maxSize}명)
             </h2>
             <span className="text-xs text-neutral-400">
               1인당 {event?.ballotsPerUser || 3}장의 제비가 투입됨
@@ -259,46 +327,28 @@ function TeamDetailContent({
           </div>
 
           <div className="mt-4 space-y-3">
-            {team.members.map((member, idx) => {
-              const memberKey = member.profileId || member.id || String(idx);
-              const displayName = member.realName || member.userName || '팀원';
-              const isLeader = member.leader ?? member.isLeader ?? false;
-
-              return (
-                <div
-                  key={memberKey}
-                  className="flex items-center justify-between rounded-xl bg-neutral-950 p-4 border border-neutral-800/80"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-800 font-bold text-neutral-300 text-xs">
-                      {displayName.slice(0, 1)}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-neutral-200">
-                          {displayName}
-                        </span>
-                        {isLeader && (
-                          <span className="rounded bg-indigo-500/20 px-1.5 py-0.5 text-[10px] font-bold text-indigo-400 border border-indigo-500/30">
-                            팀장
-                          </span>
-                        )}
-                      </div>
-                      {member.userPhone && (
-                        <div className="text-xs text-neutral-400 mt-0.5">
-                          {member.userPhone}
-                        </div>
-                      )}
-                    </div>
+            {team.members.map((member) => (
+              <div
+                key={member.profileId}
+                className="flex items-center justify-between rounded-xl bg-neutral-950 p-4 border border-neutral-800/80"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-800 font-bold text-neutral-300 text-xs">
+                    {member.realName.slice(0, 1)}
                   </div>
-                  {member.joinedAt && (
-                    <div className="text-right text-xs text-neutral-400">
-                      {formatKst(member.joinedAt)} 합류
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-neutral-200">
+                      {member.realName}
+                    </span>
+                    {member.leader && (
+                      <span className="rounded bg-indigo-500/20 px-1.5 py-0.5 text-[10px] font-bold text-indigo-400 border border-indigo-500/30">
+                        팀장
+                      </span>
+                    )}
+                  </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
 
