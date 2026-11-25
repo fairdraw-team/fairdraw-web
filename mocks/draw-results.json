@@ -1,0 +1,44 @@
+{
+  "content": [
+    {
+      "entryId": "entry-1",
+      "realName": "김민지",
+      "phone": "***-****-1234",
+      "sectionName": "A",
+      "result": "won",
+      "waitlistRank": null,
+      "teamId": null
+    },
+    {
+      "entryId": "entry-2",
+      "realName": "이준호",
+      "phone": "***-****-5678",
+      "sectionName": "A",
+      "result": "won",
+      "waitlistRank": null,
+      "teamId": "team-1"
+    },
+    {
+      "entryId": "entry-3",
+      "realName": "박지훈",
+      "phone": "***-****-9012",
+      "sectionName": "A",
+      "result": "waitlisted",
+      "waitlistRank": 1,
+      "teamId": null
+    },
+    {
+      "entryId": "entry-4",
+      "realName": "정하은",
+      "phone": "***-****-3456",
+      "sectionName": "A",
+      "result": "lost",
+      "waitlistRank": null,
+      "teamId": null
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 4,
+  "totalPages": 1
+}

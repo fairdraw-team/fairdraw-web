@@ -29,10 +29,10 @@ function EditEventContent() {
           price: ev.price,
           ballotsPerUser: ev.ballotsPerUser,
           maxTeamSize: ev.maxTeamSize,
-          eventAt: toLocalInput(ev.eventAt),
-          entryStartAt: toLocalInput(ev.entryStartAt),
-          entryEndAt: toLocalInput(ev.entryEndAt),
-          paymentDeadlineAt: toLocalInput(ev.paymentDeadlineAt),
+          startsAt: toLocalInput(ev.startsAt),
+          entryOpensAt: toLocalInput(ev.entryOpensAt),
+          entryClosesAt: toLocalInput(ev.entryClosesAt),
+          paymentDueAt: toLocalInput(ev.paymentDueAt),
         });
         setLoaded(true);
       })
@@ -43,10 +43,10 @@ function EditEventContent() {
     setServerError(null);
     const body: EventInput = {
       ...v,
-      eventAt: toKstIso(v.eventAt),
-      entryStartAt: toKstIso(v.entryStartAt),
-      entryEndAt: toKstIso(v.entryEndAt),
-      paymentDeadlineAt: toKstIso(v.paymentDeadlineAt),
+      startsAt: toKstIso(v.startsAt),
+      entryOpensAt: toKstIso(v.entryOpensAt),
+      entryClosesAt: toKstIso(v.entryClosesAt),
+      paymentDueAt: toKstIso(v.paymentDueAt),
     };
     try {
       await apiFetch(`/api/events/${id}`, { method: 'PATCH', body: JSON.stringify(body) });

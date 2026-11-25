@@ -1,4 +1,4 @@
-// 백엔드와 주고받는 데이터 모양 (Fair Draw 1~2주차 전체 범위)
+// 백엔드와 주고받는 데이터 모양 (Fair Draw 1~4주차 전체 범위)
 // ⚠️ Swagger(https://fairdraw-api.vercel.app/swagger-ui/index.html) 규격과 일치하도록 관리합니다.
 
 export type EventStatus = 'draft' | 'open' | 'closed' | 'drawn' | 'paying' | 'done';
@@ -31,20 +31,34 @@ export interface EventItem {
   title: string;
   venue: string;
   posterUrl?: string; // 공연 대표 포스터 이미지
-  eventAt: string; // 공연 일시 "2026-12-20T19:00:00+09:00"
-  entryStartAt: string; // 응모 시작
-  entryEndAt: string; // 응모 마감
-  paymentDeadlineAt: string; // 결제 마감
+  startsAt: string; // 공연 일시 "2026-12-20T19:00:00+09:00"
+  entryOpensAt: string; // 응모 시작
+  entryClosesAt: string; // 응모 마감
+  paymentDueAt: string; // 결제 마감
+  // 프론트A 기존 파일(origin/main) 미수정 호환용 필드
+  eventAt: string;
+  entryStartAt: string;
+  entryEndAt: string;
+  paymentDeadlineAt: string;
   price: number;
   ballotsPerUser: number; // 1인당 제비 수 (기본 3)
   maxTeamSize: number; // 최대 연석 인원 (기본 2)
   status: EventStatus;
   sections?: Section[];
-  deletedAt?: string | null; // 휴지통 삭제 일시 (있으면 휴지통 보관 상태)
-  paymentDueAt?: string;
 }
 
-export type EventInput = Omit<EventItem, 'id' | 'status' | 'sections'>;
+export interface EventInput {
+  title: string;
+  venue: string;
+  posterUrl?: string;
+  startsAt: string;
+  entryOpensAt: string;
+  entryClosesAt: string;
+  paymentDueAt: string;
+  price: number;
+  ballotsPerUser: number;
+  maxTeamSize: number;
+}
 
 export interface SectionInput {
   name: string;
@@ -52,17 +66,11 @@ export interface SectionInput {
   price: number | null;
 }
 
-// 2주차: 연석 팀(Team) 모델
+// 2주차 & P-4: 연석 팀(Team) 모델 (백엔드 TeamDtos 규격)
 export interface TeamMember {
   profileId: string;
   realName: string;
   leader: boolean;
-  // 기존 mock 및 화면 호환용 선택 필드
-  id?: string;
-  userName?: string;
-  userPhone?: string;
-  isLeader?: boolean;
-  joinedAt?: string;
 }
 
 export interface Team {
@@ -71,63 +79,64 @@ export interface Team {
   sectionId: string;
   sectionName: string;
   leaderId: string;
-  inviteCode: string;
+  inviteCode: string | null;
   maxSize: number;
   full: boolean;
   members: TeamMember[];
-  // 기존 mock 및 화면 호환용 선택 필드
-  eventTitle?: string;
-  maxMembers?: number;
-  status?: 'forming' | 'complete' | 'dissolved' | string;
 }
 
-// 2주차: 주최자 실시간 통계 및 응모자 명단 모델
+// 2주차 & P-4: 주최자 실시간 통계 및 응모자 명단 모델 (백엔드 EntryDtos 규격)
 export interface SectionStat {
   sectionId: string;
-  sectionName: string;
+  name: string;
   capacity: number;
-  entryCount: number;
-  ballotCount: number;
-  ratio: string; // 경쟁률 예: "3.2 : 1"
+  applicants: number;
+  ballots: number;
+  ratio: number; // 숫자(예: 3.2)라서 ": 1"은 화면이 붙임
 }
 
 export interface EventStats {
   eventId: string;
-  totalEntries: number; // 총 응모 인원
-  totalBallots: number; // 총 투입된 제비 수
-  totalTeams: number; // 연석 팀 수
-  cancelledEntries: number; // 취소된 응모 수
-  sectionStats: SectionStat[];
+  status: EventStatus;
+  totalApplicants: number;
+  totalBallots: number;
+  teamCount: number;
+  cancelledCount: number;
+  sections: SectionStat[];
 }
 
 export interface EventEntry {
   id: string;
-  userId: string;
-  userName: string;
-  userPhone: string;
-  sectionName: string;
-  ballotCount: number;
-  isTeam: boolean;
-  teamId?: string | null;
+  realName: string;
+  phone: string;
+  allocations: MyEntryAllocation[];
+  ballots: number;
+  status: string;
+  teamId: string | null;
   createdAt: string;
-  status: 'active' | 'cancelled';
 }
 
 export interface EntriesPageResponse {
-  entries: EventEntry[];
-  total: number;
+  content: EventEntry[];
   page: number;
   size: number;
-  hasMore: boolean;
+  totalElements: number;
+  totalPages: number;
 }
 
-// 2주차: 공정 추첨 명단 봉인(Seal) 모델
+// 2주차 & P-4: 공정 추첨 명단 봉인(Seal) 모델 (백엔드 DrawDtos 규격)
+export interface SealSection {
+  sectionId: string;
+  name: string;
+  ballots: number;
+}
+
 export interface SealInfo {
   eventId: string;
-  hash: string; // SHA-256 64자리 지문
-  sealedAt: string; // 봉인 시각
-  totalBallots: number; // 봉인된 총 제비 수
-  totalEntries: number; // 봉인된 총 응모 건수
+  rosterHash: string;
+  sealedAt: string;
+  ballotCount: number;
+  sections: SealSection[];
 }
 
 // 백엔드 공통 에러 모양: {"code":"PHONE_TAKEN","message":"이미 가입된 번호입니다"}
@@ -136,7 +145,7 @@ export interface ApiErrorBody {
   message: string;
 }
 
-// --- 3주차: 추첨 결과 및 검증 타입 ---
+// --- 3주차 & FB-1: 추첨 결과 및 검증 타입 ---
 
 export interface MyDrawResult {
   eventId: string;
@@ -179,7 +188,26 @@ export interface PublicBallotsResponse {
   eventId: string;
   ballots: PublicBallot[];
 }
-// --- 4주차: 예매, 결제, 티켓 타입 ---
+
+export interface DrawResultRow {
+  entryId: string;
+  realName: string;
+  phone: string;
+  sectionName: string;
+  result: 'won' | 'waitlisted' | 'lost';
+  waitlistRank: number | null;
+  teamId: string | null;
+}
+
+export interface DrawResultPage {
+  content: DrawResultRow[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+// --- 4주차: 예매, 결제, 티켓, 주최자 결제 현황, 스캔 타입 ---
 
 export interface MyBooking {
   bookingId: string;
@@ -216,4 +244,61 @@ export interface MyTicket {
   code: string; // 40글자 16진수 비밀값
   status: 'valid' | 'used' | 'void';
   usedAt: string | null;
+}
+
+// FB-3: 주최자 결제 현황 통계 및 예매 명단
+export interface PaymentSectionStat {
+  sectionId: string;
+  name: string;
+  capacity: number;
+  paid: number;
+  pending: number;
+  expired: number;
+  succeeded: number;
+  waitlistLeft: number;
+}
+
+export interface PaymentStats {
+  eventId: string;
+  status: EventStatus;
+  paymentDueAt: string;
+  issued: number;
+  entered: number;
+  sections: PaymentSectionStat[];
+}
+
+export interface BookingRow {
+  bookingId: string;
+  realName: string;
+  phone: string;
+  sectionName: string;
+  status: 'pending' | 'paid' | 'expired' | 'cancelled';
+  amount: number;
+  payDueAt: string;
+  source: 'draw' | 'succession';
+  paidAt: string | null;
+}
+
+export interface BookingPage {
+  content: BookingRow[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+// FB-4: 스태프/주최자 입장 스캔 요약 및 판정 응답
+export interface ScanSummary {
+  eventId: string;
+  eventTitle: string;
+  issued: number;
+  entered: number;
+}
+
+export interface ScanResult {
+  result: 'ok' | 'duplicate' | 'invalid';
+  sectionName: string | null;
+  scannedAt: string;
+  holderName: string | null;
+  message: string;
 }

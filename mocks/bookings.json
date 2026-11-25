@@ -1,0 +1,41 @@
+{
+  "content": [
+    {
+      "bookingId": "booking-1",
+      "realName": "김민지",
+      "phone": "***-****-1234",
+      "sectionName": "A",
+      "status": "paid",
+      "amount": 1000,
+      "payDueAt": "2026-11-30T18:00:00+09:00",
+      "source": "draw",
+      "paidAt": "2026-11-25T08:20:00Z"
+    },
+    {
+      "bookingId": "booking-2",
+      "realName": "이준호",
+      "phone": "***-****-5678",
+      "sectionName": "A",
+      "status": "pending",
+      "amount": 1000,
+      "payDueAt": "2026-11-30T18:00:00+09:00",
+      "source": "draw",
+      "paidAt": null
+    },
+    {
+      "bookingId": "booking-3",
+      "realName": "박지훈",
+      "phone": "***-****-9012",
+      "sectionName": "A",
+      "status": "expired",
+      "amount": 1000,
+      "payDueAt": "2026-11-25T09:15:00+09:00",
+      "source": "succession",
+      "paidAt": null
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 3,
+  "totalPages": 1
+}

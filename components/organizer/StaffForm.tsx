@@ -1,5 +1,5 @@
 'use client';
-// 현장 입장 검표 스태프 등록 (관계자용 정중한 존댓말 적용)
+// 현장 입장 검표 스태프 등록 (관계자용 정중한 존댓말 적용 · FB-5 안내 문구 포함)
 import { useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { inputCls } from './EventInfoFields';
@@ -26,12 +26,21 @@ export function StaffForm({ eventId }: { eventId: string }) {
     }
     setBusy(true);
     try {
-      await apiFetch(`/api/events/${eventId}/staff`, { method: 'POST', body: JSON.stringify({ phone: e164 }) });
+      await apiFetch(`/api/events/${eventId}/staff`, {
+        method: 'POST',
+        body: JSON.stringify({ phone: e164 }),
+      });
       setAdded((a) => [...a, phone]);
       setPhone('');
-      setMsg({ ok: true, text: '현장 입장 스태프 권한이 성공적으로 등록되었습니다.' });
+      setMsg({
+        ok: true,
+        text: '이 번호로 휴대폰 인증을 마친 계정으로 로그인해야 스캔할 수 있습니다',
+      });
     } catch (err) {
-      setMsg({ ok: false, text: err instanceof Error ? err.message : '스태프 등록에 실패하였습니다.' });
+      setMsg({
+        ok: false,
+        text: err instanceof Error ? err.message : '스태프 등록에 실패하였습니다.',
+      });
     } finally {
       setBusy(false);
     }
@@ -61,7 +70,7 @@ export function StaffForm({ eventId }: { eventId: string }) {
         </button>
       </form>
       {msg && (
-        <p role="status" className={`mt-2.5 text-xs font-medium ${msg.ok ? 'text-emerald-700' : 'text-rose-600'}`}>
+        <p role="status" className={`mt-2.5 text-xs font-semibold ${msg.ok ? 'text-emerald-700' : 'text-rose-600'}`}>
           {msg.text}
         </p>
       )}
@@ -75,6 +84,9 @@ export function StaffForm({ eventId }: { eventId: string }) {
               </li>
             ))}
           </ul>
+          <p className="mt-2 text-xs font-medium text-stone-500">
+            * 이 번호로 휴대폰 인증을 마친 계정으로 로그인해야 스캔할 수 있습니다.
+          </p>
         </div>
       )}
     </section>

@@ -65,7 +65,7 @@ export function EventInfoFields() {
     reader.readAsDataURL(file);
   }
 
-  const date = (name: 'entryStartAt' | 'entryEndAt' | 'paymentDeadlineAt' | 'eventAt', label: string) => (
+  const date = (name: 'entryOpensAt' | 'entryClosesAt' | 'paymentDueAt' | 'startsAt', label: string) => (
     <Field label={label} error={errors[name]}>
       <input type="datetime-local" className={inputCls} aria-invalid={!!errors[name]} {...register(name)} />
     </Field>
@@ -164,10 +164,10 @@ export function EventInfoFields() {
           안내: <strong>응모 시작 &lt; 응모 마감 &lt; 결제 마감 &lt; 공연 일시</strong> 순서로 입력해 주셔야 정상 등록됩니다.
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
-          {date('entryStartAt', '1. 응모 시작 일시')}
-          {date('entryEndAt', '2. 응모 마감 일시')}
-          {date('paymentDeadlineAt', '3. 당첨자 결제 마감 일시')}
-          {date('eventAt', '4. 실제 공연 일시')}
+          {date('entryOpensAt', '1. 응모 시작 일시')}
+          {date('entryClosesAt', '2. 응모 마감 일시')}
+          {date('paymentDueAt', '3. 당첨자 결제 마감 일시')}
+          {date('startsAt', '4. 실제 공연 일시')}
         </div>
       </fieldset>
 

@@ -38,10 +38,10 @@ function NewEventFormContent() {
     setServerError(null);
     const body: EventInput = {
       ...v,
-      eventAt: toKstIso(v.eventAt),
-      entryStartAt: toKstIso(v.entryStartAt),
-      entryEndAt: toKstIso(v.entryEndAt),
-      paymentDeadlineAt: toKstIso(v.paymentDeadlineAt),
+      startsAt: toKstIso(v.startsAt),
+      entryOpensAt: toKstIso(v.entryOpensAt),
+      entryClosesAt: toKstIso(v.entryClosesAt),
+      paymentDueAt: toKstIso(v.paymentDueAt),
     };
     let created: EventItem | null = null;
     try {
