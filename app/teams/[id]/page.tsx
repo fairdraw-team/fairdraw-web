@@ -3,11 +3,18 @@
 import { Suspense, use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft, Check, Copy, Share2, Users } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { formatKst } from '@/lib/datetime';
 import { isAtLeast } from '@/lib/eventStatus';
 import { SealBox } from '@/components/SealBox';
-import type { EventItem, MyBooking, MyDrawResult, SealInfo, Team } from '@/types/api';
+import type {
+  EventItem,
+  MyBooking,
+  MyDrawResult,
+  SealInfo,
+  Team,
+} from '@/types/api';
 
 function TeamDetailContent({
   params,
@@ -41,7 +48,11 @@ function TeamDetailContent({
           const eventData = await apiFetch<EventItem>(
             `/api/public/events/${teamData.eventId}`,
             { auth: false },
-          ).catch(() => apiFetch<EventItem>(`/api/events/${teamData.eventId}`, { auth: false }));
+          ).catch(() =>
+            apiFetch<EventItem>(`/api/events/${teamData.eventId}`, {
+              auth: false,
+            }),
+          );
 
           if (!ignore && eventData) {
             setEvent(eventData);
@@ -56,18 +67,20 @@ function TeamDetailContent({
                 .catch(() => {});
             }
 
-            // FB-5: 공연이 drawn 이상이면 draw/me로 팀의 결과 한 줄을 불러옴
             if (isAtLeast(eventData.status, 'drawn')) {
-              apiFetch<MyDrawResult>(`/api/events/${teamData.eventId}/draw/me`)
+              apiFetch<MyDrawResult>(
+                `/api/events/${teamData.eventId}/draw/me`,
+              )
                 .then((d) => {
                   if (!ignore) setDrawMe(d);
                 })
                 .catch(() => {});
             }
 
-            // FB-5: 공연이 paying 이상이면 booking/me로 내 예매 상태 한 줄을 불러옴
             if (isAtLeast(eventData.status, 'paying')) {
-              apiFetch<MyBooking>(`/api/events/${teamData.eventId}/booking/me`)
+              apiFetch<MyBooking>(
+                `/api/events/${teamData.eventId}/booking/me`,
+              )
                 .then((b) => {
                   if (!ignore) setBookingMe(b);
                 })
@@ -78,7 +91,9 @@ function TeamDetailContent({
       } catch (err) {
         if (!ignore) {
           setErrorMsg(
-            err instanceof Error ? err.message : '팀 정보를 불러오지 못했습니다.',
+            err instanceof Error
+              ? err.message
+              : '팀 정보를 불러오지 못했습니다.',
           );
         }
       } finally {
@@ -148,33 +163,34 @@ function TeamDetailContent({
       alert('성공적으로 팀 탈퇴 처리가 완료되었습니다.');
       router.push('/events');
     } catch (err) {
-      alert(err instanceof Error ? err.message : '팀 탈퇴 처리에 실패했습니다.');
+      alert(
+        err instanceof Error ? err.message : '팀 탈퇴 처리에 실패했습니다.',
+      );
       setLeaving(false);
     }
   };
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center p-4">
-        <div className="flex items-center gap-3 text-neutral-400 text-sm">
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-400 border-t-transparent" />
-          팀 정보를 불러오는 중입니다...
-        </div>
+      <main className="flex min-h-screen items-center justify-center bg-[#F7F8FA] p-4 text-xs text-[#6B7684]">
+        팀 정보를 불러오는 중입니다…
       </main>
     );
   }
 
   if (!team) {
     return (
-      <main className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
-          <h2 className="text-lg font-bold text-neutral-200">팀 정보를 찾을 수 없습니다</h2>
-          <p className="mt-2 text-xs text-neutral-400 leading-relaxed">
+      <main className="flex min-h-screen items-center justify-center bg-[#F7F8FA] p-4">
+        <div className="w-full max-w-sm rounded-lg border border-[#E5E8EB] bg-white p-6 text-center">
+          <h2 className="text-sm font-semibold text-[#191F28]">
+            팀 정보를 찾을 수 없습니다
+          </h2>
+          <p className="mt-1.5 text-xs leading-relaxed text-[#6B7684]">
             {errorMsg || '요청하신 연석 팀 정보가 존재하지 않거나 해체되었습니다.'}
           </p>
           <Link
             href="/events"
-            className="mt-6 inline-block rounded-xl bg-neutral-800 px-5 py-2.5 text-xs font-semibold text-neutral-200 hover:bg-neutral-700"
+            className="mt-4 inline-block rounded-md border border-[#D1D6DB] bg-white px-4 py-2 text-xs font-medium text-[#333D4B] transition-colors hover:bg-[#F2F4F6]"
           >
             공연 목록으로 이동
           </Link>
@@ -183,7 +199,9 @@ function TeamDetailContent({
     );
   }
 
-  const isClosed = event ? event.status !== 'open' && event.status !== 'draft' : false;
+  const isClosed = event
+    ? event.status !== 'open' && event.status !== 'draft'
+    : false;
   const isDrawn = event ? isAtLeast(event.status, 'drawn') : false;
   const isPaying = event ? isAtLeast(event.status, 'paying') : false;
 
@@ -206,170 +224,211 @@ function TeamDetailContent({
           : null;
 
   return (
-    <main className="min-h-screen bg-neutral-950 text-neutral-100 py-10 px-4 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-xl space-y-6">
-        {/* 상단 네비게이션 */}
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-[#F7F8FA] text-[#191F28] antialiased font-['Pretendard','Noto_Sans_KR','Apple_SD_Gothic_Neo','Malgun_Gothic',sans-serif]">
+      <header className="border-b border-[#E5E8EB] bg-white">
+        <div className="mx-auto flex h-14 max-w-xl items-center justify-between px-4">
           <Link
             href="/events"
-            className="inline-flex items-center text-xs font-medium text-neutral-400 transition hover:text-neutral-200"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-[#6B7684] transition-colors hover:text-[#191F28]"
           >
-            &larr; 공연 목록으로 돌아가기
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>공연 목록</span>
           </Link>
-          <div className="flex items-center gap-2">
-            {team.full ? (
-              <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-xs font-bold text-emerald-400">
-                팀 완성 ({team.members.length}/{team.maxSize}명)
-              </span>
-            ) : (
-              <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-xs font-bold text-amber-400">
-                팀원 모집 중 ({team.members.length}/{team.maxSize}명)
-              </span>
-            )}
-          </div>
+          <span
+            className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-[11px] font-medium ${
+              team.full
+                ? 'border-emerald-200/80 bg-emerald-50 text-emerald-700'
+                : 'border-amber-200/80 bg-amber-50 text-amber-800'
+            }`}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                team.full ? 'bg-emerald-500' : 'bg-amber-500'
+              }`}
+              aria-hidden="true"
+            />
+            {team.full
+              ? `팀 완성 (${team.members.length}/${team.maxSize}명)`
+              : `모집 중 (${team.members.length}/${team.maxSize}명)`}
+          </span>
         </div>
+      </header>
 
-        {/* 공연 및 구역 요약 카드 */}
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-6 shadow-xl">
-          <div className="text-xs font-medium text-neutral-400">연석 응모 지정 공연</div>
-          <h1 className="mt-1 text-xl font-bold text-white tracking-tight">
-            {event?.title || '공연명'}
+      <main className="mx-auto max-w-xl space-y-5 px-4 py-8">
+        {/* 공연 및 구역 요약 */}
+        <section className="rounded-lg border border-[#E5E8EB] bg-white p-5">
+          <h1 className="text-lg font-semibold tracking-tight text-[#191F28]">
+            {event?.title || '연석 응모 팀'}
           </h1>
-          <div className="mt-3 flex flex-wrap gap-2 text-xs">
-            <span className="rounded-md bg-neutral-800 px-2.5 py-1 text-neutral-300 font-medium">
-              선택 구역: {team.sectionName}
-            </span>
+          <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-[#6B7684]">
+            <div className="flex items-center gap-1.5">
+              <dt>선택 구역</dt>
+              <dd className="font-semibold text-[#191F28]">{team.sectionName}</dd>
+            </div>
             {event?.startsAt && (
-              <span className="rounded-md bg-neutral-800 px-2.5 py-1 text-neutral-400">
-                일시: {formatKst(event.startsAt)}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <dt>공연 일시</dt>
+                <dd className="font-medium tabular-nums text-[#333D4B]">
+                  {formatKst(event.startsAt)}
+                </dd>
+              </div>
             )}
-          </div>
-        </div>
+          </dl>
+        </section>
 
-        {/* FB-5: 공연이 drawn 이상이면 팀 추첨 결과 한 줄 & paying 이상이면 내 예매 상태 한 줄 + 안내 + 내 결과 보기 링크 */}
+        {/* 추첨 및 예매 상태 */}
         {isDrawn && (
-          <div className="rounded-2xl border border-indigo-500/30 bg-indigo-950/30 p-5 space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">
+          <section className="overflow-hidden rounded-lg border border-[#BFDBFE] bg-[#F5F9FF]">
+            <div className="flex items-center justify-between gap-2 border-b border-[#DCEBFF] px-5 py-3">
+              <h2 className="text-xs font-semibold text-[#191F28]">
                 팀 추첨 및 예매 상태
-              </span>
+              </h2>
               <Link
                 href={`/events/${team.eventId}/result`}
-                className="rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-bold text-white transition hover:bg-indigo-500"
+                className="rounded-md bg-[#1B64DA] px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-[#1554BD]"
               >
-                내 결과 보기 &rarr;
+                내 결과 보기
               </Link>
             </div>
 
-            {drawResultText && (
-              <p className="text-sm font-bold text-white">{drawResultText}</p>
-            )}
-
-            {isPaying && (
-              <div className="space-y-1.5 border-t border-indigo-500/20 pt-3 text-xs">
-                {bookingStatusText && (
-                  <p className="font-bold text-emerald-400">
-                    내 예매 상태: {bookingStatusText}
-                  </p>
-                )}
-                <p className="text-neutral-300 font-medium">
-                  팀원은 각자 결제합니다. 팀원이 결제하지 않으면 옆자리가 다른 사람에게 넘어갑니다.
+            <div className="space-y-2.5 px-5 py-4">
+              {drawResultText && (
+                <p className="text-sm font-semibold text-[#191F28]">
+                  {drawResultText}
                 </p>
-              </div>
-            )}
-          </div>
+              )}
+
+              {isPaying && (
+                <div className="space-y-1 border-t border-[#DCEBFF] pt-2.5 text-xs">
+                  {bookingStatusText && (
+                    <p className="font-semibold text-emerald-700">
+                      내 예매 상태: {bookingStatusText}
+                    </p>
+                  )}
+                  <p className="text-[#4E5968]">
+                    팀원은 각자 결제합니다. 팀원이 결제하지 않으면 옆자리가 다른 사람에게 넘어갑니다.
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
         )}
 
-        {/* 팀장 전용 초대 코드 박스 */}
+        {/* 팀장 전용 초대 코드 */}
         {team.inviteCode && !isClosed && (
-          <div className="rounded-2xl border-2 border-dashed border-indigo-500/40 bg-indigo-950/20 p-6 text-center shadow-lg">
-            <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400">
-              친구 초대 전용 코드
-            </span>
-            <div className="my-3 font-mono text-4xl font-extrabold tracking-widest text-indigo-300 select-all">
-              {team.inviteCode}
+          <section className="overflow-hidden rounded-lg border border-[#E5E8EB] bg-white">
+            <div className="border-b border-[#E5E8EB] px-5 py-3.5">
+              <h2 className="text-sm font-semibold text-[#191F28]">
+                동행자 초대 코드
+              </h2>
+              <p className="mt-0.5 text-xs text-[#6B7684]">
+                동행자가 아래 6자리 코드를 입력하면 같은 구역으로 자동 응모됩니다.
+              </p>
             </div>
-            <p className="text-xs text-neutral-400 mb-5 leading-relaxed">
-              함께 관람할 동행자에게 초대 코드를 보내주세요. 동행자가 코드를 입력하면 이 구역으로 자동 응모됩니다.
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={handleCopyCode}
-                className="rounded-xl bg-neutral-800 py-3 text-xs font-semibold text-neutral-200 transition hover:bg-neutral-700"
-              >
-                {copiedCode ? '코드 복사 완료!' : '초대 코드 복사'}
-              </button>
-              <button
-                type="button"
-                onClick={handleShareLink}
-                className="rounded-xl bg-indigo-600 py-3 text-xs font-semibold text-white shadow transition hover:bg-indigo-500"
-              >
-                {copiedLink ? '링크 복사 완료!' : '초대 링크 공유'}
-              </button>
+            <div className="p-5 text-center">
+              <div className="rounded-md border border-dashed border-[#B0B8C1] bg-[#F9FAFB] py-4 font-mono text-3xl font-bold tracking-[0.2em] text-[#191F28] select-all">
+                {team.inviteCode}
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleCopyCode}
+                  className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[#D1D6DB] bg-white py-2 text-xs font-medium text-[#333D4B] transition-colors hover:bg-[#F2F4F6]"
+                >
+                  {copiedCode ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
+                      <span className="text-emerald-700">코드 복사됨</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5 text-[#6B7684]" aria-hidden="true" />
+                      <span>초대 코드 복사</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleShareLink}
+                  className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md bg-[#1B64DA] py-2 text-xs font-medium text-white transition-colors hover:bg-[#1554BD]"
+                >
+                  {copiedLink ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                      <span>링크 복사됨</span>
+                    </>
+                  ) : (
+                    <>
+                      <Share2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      <span>초대 링크 공유</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-          </div>
+          </section>
         )}
 
-        {/* 마감 후 명단 봉인 박스 표시 */}
         {isClosed && seal && <SealBox seal={seal} />}
 
-        {/* 현재 팀원 목록 (P-4: profileId, realName, leader만 사용) */}
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-6 shadow-xl">
-          <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
-            <h2 className="text-sm font-bold text-neutral-200">
-              참여 팀원 ({team.members.length} / {team.maxSize}명)
+        {/* 참여 팀원 목록 */}
+        <section className="overflow-hidden rounded-lg border border-[#E5E8EB] bg-white">
+          <div className="flex items-center justify-between border-b border-[#E5E8EB] px-5 py-3.5">
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-[#191F28]">
+              <Users className="h-4 w-4 text-[#6B7684]" aria-hidden="true" />
+              <span>
+                참여 팀원 ({team.members.length}/{team.maxSize}명)
+              </span>
             </h2>
-            <span className="text-xs text-neutral-400">
-              1인당 {event?.ballotsPerUser || 3}장의 제비가 투입됨
+            <span className="text-xs tabular-nums text-[#6B7684]">
+              1인당 제비 {event?.ballotsPerUser || 3}장
             </span>
           </div>
 
-          <div className="mt-4 space-y-3">
+          <ul className="divide-y divide-[#E5E8EB]">
             {team.members.map((member) => (
-              <div
+              <li
                 key={member.profileId}
-                className="flex items-center justify-between rounded-xl bg-neutral-950 p-4 border border-neutral-800/80"
+                className="flex items-center justify-between px-5 py-3"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-800 font-bold text-neutral-300 text-xs">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md border border-[#E5E8EB] bg-[#F7F8FA] text-xs font-semibold text-[#4E5968]">
                     {member.realName.slice(0, 1)}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-neutral-200">
-                      {member.realName}
-                    </span>
-                    {member.leader && (
-                      <span className="rounded bg-indigo-500/20 px-1.5 py-0.5 text-[10px] font-bold text-indigo-400 border border-indigo-500/30">
-                        팀장
-                      </span>
-                    )}
-                  </div>
+                  <span className="text-sm font-medium text-[#191F28]">
+                    {member.realName}
+                  </span>
                 </div>
-              </div>
+                {member.leader ? (
+                  <span className="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-[#1B64DA]">
+                    팀장
+                  </span>
+                ) : (
+                  <span className="text-xs text-[#8B95A1]">팀원</span>
+                )}
+              </li>
             ))}
-          </div>
-        </div>
+          </ul>
+        </section>
 
-        {/* 탈퇴 / 해체 액션 (마감 전까지만 노출) */}
+        {/* 탈퇴 / 해체 */}
         {!isClosed && (
-          <div className="pt-2">
+          <div className="pt-1">
             <button
               type="button"
               disabled={leaving}
               onClick={handleLeaveTeam}
-              className="w-full rounded-xl border border-rose-500/30 bg-rose-950/20 py-3 text-xs font-semibold text-rose-400 transition hover:bg-rose-950/40 disabled:opacity-50"
+              className="w-full cursor-pointer rounded-md border border-rose-200 bg-white py-2.5 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {leaving ? '탈퇴 처리 중입니다...' : '팀 탈퇴 및 해체하기'}
+              {leaving ? '탈퇴 처리 중입니다…' : '팀 탈퇴 및 해체하기'}
             </button>
-            <p className="mt-2 text-center text-xs text-neutral-400">
-              * 마감 전까지만 탈퇴가 가능하며, 마감 이후에는 공정 추첨 무결성을 위해 취소하실 수 없습니다.
+            <p className="mt-2 text-center text-xs text-[#6B7684]">
+              마감 전까지만 탈퇴 가능하며, 마감 이후에는 공정 추첨 무결성을 위해 취소할 수 없습니다.
             </p>
           </div>
         )}
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
 
@@ -381,11 +440,8 @@ export default function TeamDetailPage({
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center p-4">
-          <div className="flex items-center gap-3 text-neutral-400 text-sm">
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-400 border-t-transparent" />
-            팀 화면을 불러오는 중입니다...
-          </div>
+        <main className="flex min-h-screen items-center justify-center bg-[#F7F8FA] p-4 text-xs text-[#6B7684]">
+          팀 화면을 불러오는 중입니다…
         </main>
       }
     >
