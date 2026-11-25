@@ -175,7 +175,7 @@ function EnterEventContent({
         <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-xs">
           <h1 className="text-lg font-black text-stone-900">{event.title}</h1>
           <p className="mt-1 text-xs text-stone-500">
-            {event.venue} · {formatKst(event.eventAt)}
+            {event.venue} · {formatKst(event.startsAt)}
           </p>
         </div>
 
@@ -285,10 +285,10 @@ function EnterEventContent({
             {isClosed
               ? '응모가 마감된 공연입니다'
               : submitting
-              ? '응모 접수 중입니다…'
-              : usedBallots === 0
-              ? '최소 1장 이상의 제비를 배분해 주세요'
-              : `총 ${usedBallots}장 제비로 응모하기`}
+                ? '응모 접수 중입니다…'
+                : usedBallots === 0
+                  ? '최소 1장 이상의 제비를 배분해 주세요'
+                  : `총 ${usedBallots}장 제비로 응모하기`}
           </button>
         </form>
       </main>

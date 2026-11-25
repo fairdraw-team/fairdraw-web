@@ -111,9 +111,9 @@ function EventDetailContent({
           title: data.title,
           place: data.venue,
           status: data.status,
-          startAt: data.eventAt,
-          endAt: data.eventAt,
-          closeAt: data.entryEndAt,
+          startAt: data.startsAt,
+          endAt: data.startsAt,
+          closeAt: data.entryClosesAt,
           ballotsPerPerson: data.ballotsPerUser || 3,
           sections: (data.sections ?? []).map((s) => ({
             id: s.id,
@@ -346,13 +346,12 @@ function EventDetailContent({
                 추첨제 응모
               </span>
               <span
-                className={`rounded-full border px-[10px] py-[2px] text-[11px] font-[600] ${
-                  isDrawn
-                    ? 'border-[#3B73E8] bg-[#EEF4FF] text-[#3B73E8]'
-                    : isOpenNow
-                      ? 'border-[#1E9E63] text-[#1E9E63]'
-                      : 'border-[#bbb] text-[#888]'
-                }`}
+                className={`rounded-full border px-[10px] py-[2px] text-[11px] font-[600] ${isDrawn
+                  ? 'border-[#3B73E8] bg-[#EEF4FF] text-[#3B73E8]'
+                  : isOpenNow
+                    ? 'border-[#1E9E63] text-[#1E9E63]'
+                    : 'border-[#bbb] text-[#888]'
+                  }`}
               >
                 {isDrawn ? '추첨 완료' : isOpenNow ? '응모 진행중' : '응모 마감'}
               </span>
@@ -389,9 +388,8 @@ function EventDetailContent({
                     {event.sections.map((sec, i) => (
                       <tr
                         key={sec.id}
-                        className={`hover:bg-[#fafafa] ${
-                          i < event.sections.length - 1 ? 'border-b border-[#eee]' : ''
-                        }`}
+                        className={`hover:bg-[#fafafa] ${i < event.sections.length - 1 ? 'border-b border-[#eee]' : ''
+                          }`}
                       >
                         <td className="px-[12px] py-[8px] font-[700] text-[#111]">{sec.name}</td>
                         <td className="px-[12px] py-[8px] text-[#666]">{sec.desc}</td>
@@ -586,11 +584,10 @@ function EventDetailContent({
                   role="tab"
                   aria-selected={on}
                   onClick={() => setActiveTab(t)}
-                  className={`[font-family:inherit] h-[44px] border border-b-0 text-[13px] ${
-                    on
-                      ? '-mb-px border-[#ccc] border-t-2 border-t-[#111] bg-[#fff] font-[700] text-[#111]'
-                      : 'border-[#ddd] bg-[#fafafa] text-[#666] hover:bg-[#f3f3f3]'
-                  }`}
+                  className={`[font-family:inherit] h-[44px] border border-b-0 text-[13px] ${on
+                    ? '-mb-px border-[#ccc] border-t-2 border-t-[#111] bg-[#fff] font-[700] text-[#111]'
+                    : 'border-[#ddd] bg-[#fafafa] text-[#666] hover:bg-[#f3f3f3]'
+                    }`}
                 >
                   {t}
                 </button>
