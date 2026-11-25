@@ -407,7 +407,11 @@ function EventDetailContent({
               <div className="mt-[24px] space-y-[10px]">
                 <div className="flex items-center gap-[6px] rounded-[4px] border border-[#C7DCFF] bg-[#F2F7FF] px-[14px] py-[10px] text-[12px] font-[700] text-[#1D5FD6]">
                   <ShieldCheck className="h-[16px] w-[16px] shrink-0" />
-                  추첨이 완료되었습니다. 당첨 결과 확인 및 공개 검증이 가능합니다.
+                  {event.status === 'done'
+                    ? '결제 종료 · 내 결과에서 예매 상태를 확인하세요.'
+                    : isAtLeast(event.status, 'paying')
+                      ? '결제 진행 중 · 당첨자는 내 결과에서 결제하세요.'
+                      : '추첨이 완료되었습니다. 당첨 결과 확인 및 공개 검증이 가능합니다.'}
                 </div>
                 <div className="flex flex-col gap-[8px] min-[640px]:flex-row">
                   <button
