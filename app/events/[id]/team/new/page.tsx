@@ -3,6 +3,7 @@
 import { Suspense, use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft, Info } from 'lucide-react';
 import { apiFetch, ApiError } from '@/lib/api';
 import type { EventItem, Team } from '@/types/api';
 import { formatKst } from '@/lib/datetime';
@@ -35,7 +36,11 @@ function NewTeamContent({
       })
       .catch((err) => {
         if (!ignore) {
-          setErrorMsg(err instanceof Error ? err.message : '공연 정보를 불러오지 못했습니다.');
+          setErrorMsg(
+            err instanceof Error
+              ? err.message
+              : '공연 정보를 불러오지 못했습니다.',
+          );
         }
       })
       .finally(() => {
@@ -67,9 +72,15 @@ function NewTeamContent({
       router.push(`/teams/${newTeam.id}`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        setErrorMsg('이미 해당 공연에 개인으로 응모하셨습니다. 개인 응모를 취소하신 후 팀을 생성해 주시기 바랍니다.');
+        setErrorMsg(
+          '이미 해당 공연에 개인으로 응모하셨습니다. 개인 응모를 취소하신 후 팀을 생성해 주시기 바랍니다.',
+        );
       } else {
-        setErrorMsg(err instanceof Error ? err.message : '팀 생성에 실패했습니다. 다시 시도해 주시기 바랍니다.');
+        setErrorMsg(
+          err instanceof Error
+            ? err.message
+            : '팀 생성에 실패했습니다. 다시 시도해 주시기 바랍니다.',
+        );
       }
     } finally {
       setSubmitting(false);
@@ -78,23 +89,22 @@ function NewTeamContent({
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center p-4">
-        <div className="flex items-center gap-3 text-neutral-400 text-sm">
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-400 border-t-transparent" />
-          공연 및 좌석 구역 정보를 불러오는 중입니다...
-        </div>
+      <main className="flex min-h-screen items-center justify-center bg-[#F7F8FA] p-4 text-xs text-[#6B7684]">
+        공연 및 좌석 구역 정보를 불러오는 중입니다…
       </main>
     );
   }
 
   if (!event) {
     return (
-      <main className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center p-4">
-        <div className="text-center">
-          <p className="text-neutral-400 text-sm">{errorMsg || '공연 정보를 찾을 수 없습니다.'}</p>
+      <main className="flex min-h-screen items-center justify-center bg-[#F7F8FA] p-4">
+        <div className="w-full max-w-sm rounded-lg border border-[#E5E8EB] bg-white p-6 text-center">
+          <p className="text-xs text-[#6B7684]">
+            {errorMsg || '공연 정보를 찾을 수 없습니다.'}
+          </p>
           <Link
             href="/events"
-            className="mt-4 inline-block rounded-lg bg-neutral-800 px-4 py-2 text-sm text-neutral-200 hover:bg-neutral-700"
+            className="mt-4 inline-block rounded-md border border-[#D1D6DB] bg-white px-4 py-2 text-xs font-medium text-[#333D4B] transition-colors hover:bg-[#F2F4F6]"
           >
             공연 목록으로 돌아가기
           </Link>
@@ -109,58 +119,73 @@ function NewTeamContent({
       : [{ id: 'sec-default', name: '일반석', capacity: 100, price: event.price }];
 
   return (
-    <main className="min-h-screen bg-neutral-950 text-neutral-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-xl">
-        <div className="mb-6 flex items-center justify-between">
+    <div className="min-h-screen bg-[#F7F8FA] text-[#191F28] antialiased font-['Pretendard','Noto_Sans_KR','Apple_SD_Gothic_Neo','Malgun_Gothic',sans-serif]">
+      <header className="border-b border-[#E5E8EB] bg-white">
+        <div className="mx-auto flex h-14 max-w-xl items-center justify-between px-4">
           <Link
             href="/events"
-            className="inline-flex items-center text-sm font-medium text-neutral-400 transition hover:text-neutral-200"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-[#6B7684] transition-colors hover:text-[#191F28]"
           >
-            &larr; 공연 목록으로
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>공연 목록</span>
           </Link>
-          <span className="rounded-full bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-400 border border-indigo-500/20">
-            연석 응모 팀 생성
+          <span className="text-xs font-semibold text-[#191F28]">
+            연석 팀 생성
           </span>
         </div>
+      </header>
 
-        <div className="overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl">
-          <div className="border-b border-neutral-800 bg-neutral-900/60 p-6">
-            <h1 className="text-xl font-bold tracking-tight text-white">{event.title}</h1>
-            <p className="mt-1 text-xs text-neutral-400">
-              {event.venue} &middot; {formatKst(event.startsAt)}
+      <main className="mx-auto max-w-xl px-4 py-8">
+        <section className="overflow-hidden rounded-lg border border-[#E5E8EB] bg-white">
+          <div className="border-b border-[#E5E8EB] px-6 py-5">
+            <h1 className="text-lg font-semibold tracking-tight text-[#191F28]">
+              {event.title}
+            </h1>
+            <p className="mt-1 text-xs tabular-nums text-[#6B7684]">
+              {event.venue} · {formatKst(event.startsAt)}
             </p>
           </div>
 
-          <form onSubmit={handleCreateTeam} className="p-6 space-y-6">
-            <div className="rounded-xl border border-indigo-500/20 bg-indigo-950/20 p-4 text-xs leading-relaxed text-indigo-300">
-              <strong className="block font-semibold text-indigo-200 mb-1">
-                연석 팀 안내
-              </strong>
-              팀은 한 구역에 함께 응모되며, 팀원 각자의 제비({event.ballotsPerUser || 3}장)가 모두 선택하신 구역에 투입됩니다.
-              최대 {event.maxTeamSize || 2}명까지 함께 참여하실 수 있으며, 추첨 시 전원 동시 당첨 또는 동시 탈락으로 처리됩니다.
+          <form onSubmit={handleCreateTeam} className="space-y-5 p-6">
+            <div className="flex items-start gap-2.5 rounded-md border border-[#E5E8EB] bg-[#F9FAFB] p-3.5 text-xs leading-relaxed text-[#4E5968]">
+              <Info
+                className="mt-0.5 h-4 w-4 shrink-0 text-[#1B64DA]"
+                aria-hidden="true"
+              />
+              <div>
+                <strong className="font-semibold text-[#191F28]">
+                  연석 팀 응모 안내
+                </strong>
+                <p className="mt-0.5">
+                  팀원 각자의 제비({event.ballotsPerUser || 3}장)가 선택한 구역에 함께 투입됩니다. 최대 {event.maxTeamSize || 2}명까지 참여할 수 있으며, 추첨 시 전원 동시 당첨 또는 동시 탈락으로 처리됩니다.
+                </p>
+              </div>
             </div>
 
             {errorMsg && (
-              <div className="rounded-xl border border-rose-500/30 bg-rose-950/30 p-4 text-xs text-rose-300">
+              <div
+                role="alert"
+                className="rounded-md border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700"
+              >
                 {errorMsg}
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-neutral-200 mb-3">
-                희망 구역 선택 <span className="text-rose-400">*</span>
-              </label>
-              <div className="space-y-3">
+              <div className="mb-2.5 text-xs font-semibold text-[#191F28]">
+                희망 좌석 구역 선택 <span className="text-rose-600">*</span>
+              </div>
+              <div className="divide-y divide-[#E5E8EB] overflow-hidden rounded-lg border border-[#E5E8EB]">
                 {sections.map((sec) => {
                   const isChecked = selectedSectionId === sec.id;
                   const price = sec.price ?? event.price;
                   return (
                     <label
                       key={sec.id}
-                      className={`flex cursor-pointer items-center justify-between rounded-xl border p-4 transition ${
+                      className={`flex cursor-pointer items-center justify-between px-4 py-3.5 transition-colors ${
                         isChecked
-                          ? 'border-indigo-500 bg-indigo-950/30 ring-1 ring-indigo-500'
-                          : 'border-neutral-800 bg-neutral-950 hover:border-neutral-700'
+                          ? 'bg-[#F5F9FF]'
+                          : 'bg-white hover:bg-[#F9FAFB]'
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -170,19 +195,19 @@ function NewTeamContent({
                           value={sec.id}
                           checked={isChecked}
                           onChange={() => setSelectedSectionId(sec.id)}
-                          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500"
+                          className="h-4 w-4 accent-[#1B64DA]"
                         />
                         <div>
-                          <div className="font-semibold text-sm text-neutral-100">{sec.name}</div>
-                          <div className="text-xs text-neutral-400 mt-0.5">
+                          <div className="text-sm font-medium text-[#191F28]">
+                            {sec.name}
+                          </div>
+                          <div className="mt-0.5 text-xs tabular-nums text-[#6B7684]">
                             정원 {sec.capacity.toLocaleString()}석
                           </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-sm font-bold text-neutral-200">
-                          {price.toLocaleString()}원
-                        </div>
+                      <div className="text-sm font-semibold tabular-nums text-[#191F28]">
+                        {price.toLocaleString('ko-KR')}원
                       </div>
                     </label>
                   );
@@ -190,22 +215,24 @@ function NewTeamContent({
               </div>
             </div>
 
-            <div className="pt-2">
+            <div className="pt-1">
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full rounded-xl bg-indigo-600 py-3.5 text-sm font-semibold text-white shadow-lg transition hover:bg-indigo-500 disabled:opacity-50"
+                className="w-full cursor-pointer rounded-md bg-[#1B64DA] py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#1554BD] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {submitting ? '팀을 생성하는 중입니다...' : '연석 팀 만들기 (초대 코드 발급)'}
+                {submitting
+                  ? '팀을 생성하는 중입니다…'
+                  : '연석 팀 만들기 (초대 코드 발급)'}
               </button>
-              <p className="mt-2 text-center text-xs text-neutral-400">
+              <p className="mt-2.5 text-center text-xs text-[#6B7684]">
                 팀 생성 시 팀장님의 제비 {event.ballotsPerUser || 3}장이 해당 구역으로 자동 응모됩니다.
               </p>
             </div>
           </form>
-        </div>
-      </div>
-    </main>
+        </section>
+      </main>
+    </div>
   );
 }
 
@@ -217,11 +244,8 @@ export default function NewTeamPage({
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center p-4">
-          <div className="flex items-center gap-3 text-neutral-400 text-sm">
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-400 border-t-transparent" />
-            연석 팀 생성 화면을 불러오는 중입니다...
-          </div>
+        <main className="flex min-h-screen items-center justify-center bg-[#F7F8FA] p-4 text-xs text-[#6B7684]">
+          연석 팀 생성 화면을 불러오는 중입니다…
         </main>
       }
     >

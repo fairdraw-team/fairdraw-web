@@ -1,6 +1,7 @@
 'use client';
-// 현장 입장 검표 스태프 등록 (관계자용 정중한 존댓말 적용 · FB-5 안내 문구 포함)
+
 import { useState } from 'react';
+import { UserPlus } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { inputCls } from './EventInfoFields';
 
@@ -21,7 +22,10 @@ export function StaffForm({ eventId }: { eventId: string }) {
     e.preventDefault();
     const e164 = toE164(phone);
     if (!e164) {
-      setMsg({ ok: false, text: '올바른 휴대폰 번호 형식을 입력해 주세요. (예: 010-1234-5678)' });
+      setMsg({
+        ok: false,
+        text: '올바른 휴대폰 번호 형식을 입력해 주세요. (예: 010-1234-5678)',
+      });
       return;
     }
     setBusy(true);
@@ -47,48 +51,64 @@ export function StaffForm({ eventId }: { eventId: string }) {
   }
 
   return (
-    <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-xs">
-      <h2 className="text-base font-bold text-stone-900">현장 입장 검표 스태프 관리</h2>
-      <p className="mt-1 text-xs text-stone-500">
-        공연 당일 현장에서 관객의 QR 티켓을 스캔하여 입장을 검표할 스태프의 휴대폰 번호를 등록해 주세요.
-      </p>
-      <form onSubmit={submit} className="mt-4 flex gap-2">
-        <input
-          type="tel"
-          inputMode="tel"
-          placeholder="010-1234-5678"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          className={inputCls}
-          aria-label="스태프 휴대폰 번호"
-        />
-        <button
-          disabled={busy || !phone}
-          className="shrink-0 rounded-xl bg-stone-900 px-5 text-xs font-semibold text-white transition hover:bg-stone-800 disabled:opacity-40"
-        >
-          {busy ? '등록 중…' : '스태프 등록'}
-        </button>
-      </form>
-      {msg && (
-        <p role="status" className={`mt-2.5 text-xs font-semibold ${msg.ok ? 'text-emerald-700' : 'text-rose-600'}`}>
-          {msg.text}
+    <section className="overflow-hidden rounded-lg border border-[#E5E8EB] bg-white">
+      <div className="border-b border-[#E5E8EB] px-5 py-3.5">
+        <h2 className="text-sm font-semibold text-[#191F28]">현장 검표 스태프 등록</h2>
+        <p className="mt-0.5 text-xs text-[#6B7684]">
+          공연 당일 QR 티켓 검표 권한을 부여할 스태프의 휴대폰 번호를 등록합니다.
         </p>
-      )}
-      {added.length > 0 && (
-        <div className="mt-4 border-t border-stone-100 pt-3">
-          <span className="text-xs font-semibold text-stone-500">등록된 스태프 연락처 목록:</span>
-          <ul className="mt-2 flex flex-wrap gap-2">
-            {added.map((p, i) => (
-              <li key={`${p}-${i}`} className="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-700">
-                {p}
-              </li>
-            ))}
-          </ul>
-          <p className="mt-2 text-xs font-medium text-stone-500">
-            * 이 번호로 휴대폰 인증을 마친 계정으로 로그인해야 스캔할 수 있습니다.
+      </div>
+
+      <div className="p-5">
+        <form onSubmit={submit} className="flex flex-col gap-2 sm:flex-row">
+          <input
+            type="tel"
+            inputMode="tel"
+            placeholder="010-1234-5678"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className={`${inputCls} tabular-nums sm:max-w-xs`}
+            aria-label="스태프 휴대폰 번호"
+          />
+          <button
+            type="submit"
+            disabled={busy || !phone}
+            className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-[#191F28] px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-[#333D4B] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <UserPlus className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>{busy ? '등록 중…' : '스태프 추가'}</span>
+          </button>
+        </form>
+
+        {msg && (
+          <p
+            role="status"
+            aria-live="polite"
+            className={`mt-3 text-xs font-medium ${msg.ok ? 'text-emerald-700' : 'text-rose-600'}`}
+          >
+            {msg.text}
           </p>
-        </div>
-      )}
+        )}
+
+        {added.length > 0 && (
+          <div className="mt-4 border-t border-[#E5E8EB] pt-3.5">
+            <div className="text-xs font-medium text-[#6B7684]">이번 세션에서 등록한 스태프</div>
+            <ul className="mt-2 flex flex-wrap gap-1.5">
+              {added.map((p, i) => (
+                <li
+                  key={`${p}-${i}`}
+                  className="rounded border border-[#E5E8EB] bg-[#F9FAFB] px-2.5 py-1 font-mono text-xs text-[#191F28]"
+                >
+                  {p}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-[#6B7684]">
+              등록된 번호로 휴대폰 인증을 마친 계정으로 로그인해야 현장 스캔 화면에 접근할 수 있습니다.
+            </p>
+          </div>
+        )}
+      </div>
     </section>
   );
 }
