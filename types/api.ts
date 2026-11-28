@@ -85,6 +85,17 @@ export interface Team {
   members: TeamMember[];
 }
 
+// 마이페이지 "내 팀" 목록의 한 줄 (GET /api/teams/me)
+export interface MyTeam {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  sectionName: string | null;
+  leader: boolean;
+  memberCount: number;
+  maxSize: number;
+}
+
 // 2주차 & P-4: 주최자 실시간 통계 및 응모자 명단 모델 (백엔드 EntryDtos 규격)
 export interface SectionStat {
   sectionId: string;

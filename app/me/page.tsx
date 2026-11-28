@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { apiFetch } from '@/lib/api';
-import { User, Copy, Check, LogOut, ChevronLeft, Shield, AlertCircle } from 'lucide-react';
+import { User, Copy, Check, LogOut, ChevronLeft, ChevronRight, Shield, AlertCircle, Ticket, Users } from 'lucide-react';
 import Link from 'next/link';
+import type { MyTeam } from '@/types/api';
 
 interface UserProfile {
   realName?: string;
@@ -30,6 +31,8 @@ export default function MyPage() {
   const [copied, setCopied] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string>('');
+  const [teams, setTeams] = useState<MyTeam[] | null>(null);
+  const [teamsError, setTeamsError] = useState<string>('');
 
   useEffect(() => {
     async function loadData() {
@@ -55,6 +58,13 @@ export default function MyPage() {
     }
 
     loadData();
+  }, []);
+
+  // 내가 들어가 있는 팀 목록 (GET /api/teams/me)
+  useEffect(() => {
+    apiFetch<MyTeam[]>('/api/teams/me')
+      .then(setTeams)
+      .catch(() => setTeamsError('내 팀 목록을 불러오지 못했습니다.'));
   }, []);
 
   // 1주차 전용: 백엔드 Swagger 테스트용 토큰 복사
@@ -109,7 +119,7 @@ export default function MyPage() {
         <div className="mx-auto flex h-[60px] max-w-[480px] items-center px-[16px]">
           <div className="flex items-center gap-[10px]">
             <span className="text-[26px] leading-none tracking-[-0.025em] text-[#111]">
-              ticket<span className="font-[900]">LINK</span>
+              Fair<span className="font-[900]">Draw</span>
             </span>
             <span className="text-[16px] font-[700] leading-none text-[#111]">마이페이지</span>
           </div>
@@ -163,6 +173,61 @@ export default function MyPage() {
           </dl>
         )}
 
+        {/* 내 티켓 */}
+        <section className="mt-[32px]">
+          <div className="border-b border-[#222] pb-[10px]">
+            <h2 className="m-[0px] flex items-center gap-[6px] text-[14px] font-[700] text-[#111]">
+              <Ticket className="h-[16px] w-[16px] text-[#3B73E8]" /> 내 티켓
+            </h2>
+          </div>
+          <Link
+            href="/ticket"
+            className="no-underline flex items-center justify-between border-b border-[#eee] py-[14px] text-[13px] text-[#222] hover:bg-[#fafafa]"
+          >
+            <span className="font-[700]">모바일 티켓(QR) 보기</span>
+            <ChevronRight className="h-[16px] w-[16px] text-[#999]" />
+          </Link>
+        </section>
+
+        {/* 내 팀 */}
+        <section className="mt-[32px]">
+          <div className="flex items-center justify-between border-b border-[#222] pb-[10px]">
+            <h2 className="m-[0px] flex items-center gap-[6px] text-[14px] font-[700] text-[#111]">
+              <Users className="h-[16px] w-[16px] text-[#3B73E8]" /> 내 팀
+            </h2>
+            <Link href="/teams/join" className="no-underline text-[11px] font-[700] text-[#3B73E8] hover:underline">
+              초대 코드로 합류
+            </Link>
+          </div>
+
+          {teamsError ? (
+            <p className="m-[0px] py-[20px] text-center text-[12px] text-[#D3342A]">{teamsError}</p>
+          ) : teams === null ? (
+            <p className="m-[0px] py-[20px] text-center text-[12px] text-[#888]">불러오는 중...</p>
+          ) : teams.length === 0 ? (
+            <p className="m-[0px] py-[20px] text-center text-[12px] text-[#888]">아직 들어간 팀이 없습니다.</p>
+          ) : (
+            <ul className="m-[0px] list-none p-[0px]">
+              {teams.map((t) => (
+                <li key={t.id}>
+                  <Link
+                    href={`/teams/${t.id}`}
+                    className="no-underline flex items-center justify-between border-b border-[#eee] py-[14px] text-[#222] hover:bg-[#fafafa]"
+                  >
+                    <div className="min-w-0">
+                      <p className="m-[0px] truncate text-[13px] font-[700]">{t.eventTitle}</p>
+                      <p className="m-[0px] mt-[2px] text-[12px] text-[#777]">
+                        {t.sectionName ?? '구역 미정'} · {t.memberCount}/{t.maxSize}명 · {t.leader ? '팀장' : '팀원'}
+                      </p>
+                    </div>
+                    <ChevronRight className="h-[16px] w-[16px] shrink-0 text-[#999]" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
         {/* ───── 1주차 개발용 토큰 ───── */}
         <section className="mt-[32px]">
           <div className="flex items-center justify-between border-b border-[#222] pb-[10px]">
@@ -190,7 +255,7 @@ export default function MyPage() {
 
           <div className="mt-[12px] border border-dashed border-[#ccc] bg-[#f5f5f5] px-[14px] py-[12px]">
             <p className="m-[0px] text-[12px] leading-[1.625] text-[#666]">
-              * 백엔드 담당자가 Swagger UI 상단{' '}
+              - 백엔드 담당자가 Swagger UI 상단{' '}
               <code className={`rounded-[2px] bg-[#e8e8e8] px-[4px] py-[1px] text-[11px] font-[600] text-[#333] ${MONO}`}>
                 Authorize
               </code>{' '}

@@ -6,6 +6,7 @@ import { apiFetch } from '@/lib/api';
 import { formatKst, timeLeft } from '@/lib/datetime';
 import { isAtLeast } from '@/lib/eventStatus';
 import type { EventItem } from '@/types/api';
+import { AuthMenu } from '@/components/AuthMenu';
 
 const POSTER_GRADIENTS = [
   'from-indigo-600 to-sky-500',
@@ -89,6 +90,7 @@ export default function PublicEventsPage() {
             >
               주최자 콘솔 이동 &rarr;
             </Link>
+            <AuthMenu />
           </div>
         </div>
       </header>
